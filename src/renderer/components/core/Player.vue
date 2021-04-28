@@ -85,13 +85,12 @@ div(:class="$style.player")
 </template>
 
 <script>
-import Lyric from 'lrc-file-parser'
+import Lyric from '@renderer/utils/lyric-font-player'
 import { rendererSend, rendererOn, NAMES } from '../../../common/ipc'
 import { formatPlayTime2, getRandom, checkPath, setTitle, clipboardWriteText, debounce, throttle, assertApiSupport } from '../../utils'
 import { mapGetters, mapActions, mapMutations } from 'vuex'
 import { requestMsg } from '../../utils/message'
 import { player as eventPlayerNames } from '../../../common/hotKey'
-import musicSdk from '@renderer/utils/music'
 import path from 'path'
 
 let audio
@@ -216,8 +215,9 @@ export default {
             singer: this.musicInfo.singer,
             name: this.musicInfo.name,
             album: this.musicInfo.album,
-            lyric: this.musicInfo.lrc,
-            tlyric: this.musicInfo.tlrc,
+            lrc: this.musicInfo.lrc,
+            tlrc: this.musicInfo.tlrc,
+            lxlrc: this.musicInfo.lxlrc,
             isPlay: this.isPlay,
             line: this.lyric.line,
             played_time: audio.currentTime * 1000,
@@ -272,10 +272,14 @@ export default {
     'setting.player.mediaDeviceId'(n) {
       this.setMediaDevice()
     },
-    'setting.player.isShowLyricTransition'() {
+    'setting.player.isShowLyricTranslation'() {
+      this.setLyric()
+    },
+    'setting.player.isPlayLxlrc'() {
       this.setLyric()
     },
     async list(n, o) {
+      if (this.playInfo.isTempPlay) return
       if (n === o && this.musicInfo.songmid) {
         let index = this.listId == 'download'
           ? n.findIndex(s => s.musicInfo.songmid === this.musicInfo.songmid)
@@ -327,6 +331,7 @@ export default {
   },
   methods: {
     ...mapActions('player', ['getUrl', 'getPic', 'getLrc', 'playPrev', 'playNext']),
+    ...mapActions('list', ['getOtherSource']),
     ...mapMutations('player', [
       'setPlayMusicInfo',
       'setPlayIndex',
@@ -452,6 +457,10 @@ export default {
       })
 
       window.lrc = new Lyric({
+        lineClassName: 'lrc-content',
+        fontClassName: 'font',
+        shadowContent: false,
+        activeLineClassName: 'active',
         onPlay: (line, text) => {
           this.lyric.text = text
           this.lyric.line = line
@@ -463,7 +472,7 @@ export default {
           this.lyric.lines = lines
           this.lyric.line = 0
         },
-        offset: 80,
+        // offset: 80,
       })
 
       this.handleRegisterEvent('on')
@@ -492,7 +501,7 @@ export default {
         this.setImg(targetSong.musicInfo)
         this.setLrc(targetSong.musicInfo)
       } else {
-        if (!this.assertApiSupport(targetSong.source)) return this.playNext()
+        // if (!this.assertApiSupport(targetSong.source)) return this.playNext()
         this.musicInfo.songmid = targetSong.songmid
         this.musicInfo.singer = targetSong.singer
         this.musicInfo.name = targetSong.name
@@ -573,7 +582,7 @@ export default {
     togglePlay() {
       if (!audio.src) {
         if (this.restorePlayTime != null) {
-          if (!this.assertApiSupport(this.targetSong.source)) return this.playNext()
+          // if (!this.assertApiSupport(this.targetSong.source)) return this.playNext()
           this.setUrl(this.targetSong)
         }
         return
@@ -599,7 +608,7 @@ export default {
       if (!retryedSource.includes(targetSong.source)) retryedSource.push(targetSong.source)
 
       let type = this.getPlayType(this.setting.player.highQuality, targetSong)
-      this.musicInfo.url = targetSong.typeUrl[type]
+      // this.musicInfo.url = await getMusicUrl(targetSong, type)
       this.status = this.statusText = this.$t('core.player.geting_url')
 
       return this.getUrl({ musicInfo: targetSong, originMusic, type, isRefresh }).then(url => {
@@ -613,10 +622,7 @@ export default {
 
         this.status = this.statusText = 'Try toggle source...'
 
-        return (originMusic.otherSource && originMusic.otherSource.length ? Promise.resolve(originMusic.otherSource) : musicSdk.findMusic(originMusic)).then(res => {
-          this.updateMusicInfo({ id: this.listId, index: this.playIndex, data: { otherSource: res }, musicInfo: originMusic })
-          return res
-        }).then(otherSource => {
+        return this.getOtherSource(originMusic).then(otherSource => {
           console.log('find otherSource', otherSource)
           if (otherSource.length) {
             for (const item of otherSource) {
@@ -641,13 +647,14 @@ export default {
       }
     },
     setLrc(targetSong) {
-      this.getLrc(targetSong).then(() => {
-        this.musicInfo.lrc = targetSong.lrc
-        this.musicInfo.tlrc = targetSong.tlrc
+      this.getLrc(targetSong).then(({ lyric, tlyric, lxlyric }) => {
+        this.musicInfo.lrc = lyric
+        this.musicInfo.tlrc = tlyric
+        this.musicInfo.lxlrc = lxlyric
       }).catch(() => {
         this.status = this.statusText = this.$t('core.player.lyric_error')
       }).finally(() => {
-        this.handleUpdateWinLyricInfo('lyric', { lrc: this.musicInfo.lrc, tlrc: this.musicInfo.tlrc })
+        this.handleUpdateWinLyricInfo('lyric', { lrc: this.musicInfo.lrc, tlrc: this.musicInfo.tlrc, lxlrc: this.musicInfo.lxlrc })
         this.setLyric()
       })
     },
@@ -661,6 +668,7 @@ export default {
       this.musicInfo.songmid = null
       this.musicInfo.lrc = null
       this.musicInfo.tlrc = null
+      this.musicInfo.lxlrc = null
       this.musicInfo.url = null
       this.nowPlayTime = 0
       this.maxPlayTime = 0
@@ -851,7 +859,15 @@ export default {
       })
     },
     setLyric() {
-      window.lrc.setLyric((this.setting.player.isShowLyricTransition && this.musicInfo.tlrc ? (this.musicInfo.tlrc + '\n') : '') + (this.musicInfo.lrc || ''))
+      window.lrc.setLyric(
+        this.setting.player.isPlayLxlrc && this.musicInfo.lxlrc ? this.musicInfo.lxlrc : this.musicInfo.lrc,
+        this.setting.player.isShowLyricTranslation && this.musicInfo.tlrc ? this.musicInfo.tlrc : '',
+        // (
+        //   this.setting.player.isShowLyricTranslation && this.musicInfo.tlrc
+        //     ? (this.musicInfo.tlrc + '\n')
+        //     : ''
+        // ) + (this.musicInfo.lrc || ''),
+      )
       if (this.isPlay && (this.musicInfo.url || this.listId == 'download')) {
         window.lrc.play(audio.currentTime * 1000)
         this.handleUpdateWinLyricInfo('play', audio.currentTime * 1000)
@@ -1042,7 +1058,7 @@ export default {
   height: 100%;
   border-radius: @radius-progress-border;
   transition-duration: 0.2s;
-  background-color: @color-theme;
+  background-color: @color-btn;
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
 }
 
@@ -1060,14 +1076,14 @@ export default {
   margin-left: 5px;
   height: 100%;
   width: 20px;
-  color: @color-theme;
+  color: @color-btn;
   display: flex;
   flex-flow: column nowrap;
   justify-content: center;
   align-items: center;
 
   transition: opacity 0.2s ease;
-  opacity: .5;
+  opacity: .6;
   cursor: pointer;
 
   svg {
@@ -1211,10 +1227,10 @@ each(@themes, {
       // }
     }
     .titleBtn {
-      color: ~'@{color-@{value}-theme}';
+      color: ~'@{color-@{value}-btn}';
     }
     .play-btn {
-      color: ~'@{color-@{value}-theme}';
+      color: ~'@{color-@{value}-btn}';
       svg {
         filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.3));
       }
@@ -1224,7 +1240,7 @@ each(@themes, {
     }
 
     .volume-bar {
-      background-color: ~'@{color-@{value}-theme}';
+      background-color: ~'@{color-@{value}-btn}';
     }
 
 
