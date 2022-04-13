@@ -153,16 +153,9 @@ exports.initSetting = isShowErrorAlert => {
     // 迁移列表滚动位置设置 ~0.18.3
     if (setting.list.scroll) {
       let scroll = setting.list.scroll
-      electronStore_list.set('defaultList.location', scroll.locations.default || 0)
-      electronStore_list.set('loveList.location', scroll.locations.love || 0)
       electronStore_config.delete('setting.list.scroll')
       electronStore_config.set('setting.list.isSaveScrollLocation', scroll.enable)
       delete setting.list.scroll
-    }
-
-    if (setting.player.isShowLyricTransition != null) { // 修正拼写问题 v1.8.2 及以前
-      setting.player.isShowLyricTranslation = setting.player.isShowLyricTransition
-      delete setting.player.isShowLyricTransition
     }
   }
 
@@ -174,6 +167,18 @@ exports.initSetting = isShowErrorAlert => {
   }
 
   const { version: settingVersion, setting: newSetting } = exports.mergeSetting(setting, electronStore_config.get('version'))
+
+  // 修正拼写问题 v1.8.2 及以前
+  if (newSetting.player.isShowLyricTransition != null) {
+    newSetting.player.isShowLyricTranslation = newSetting.player.isShowLyricTransition
+    delete newSetting.player.isShowLyricTransition
+  }
+
+  // 迁移v1.19.0之前的主题设置
+  if (newSetting.themeId != null) {
+    newSetting.theme.id = newSetting.themeId
+    delete newSetting.themeId
+  }
 
   // 重置 ^0.18.2 排行榜ID
   if (!newSetting.leaderboard.tabId.includes('__')) newSetting.leaderboard.tabId = 'kw__16'

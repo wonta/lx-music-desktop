@@ -17,18 +17,20 @@ export default {
   limit_list: 30,
   limit_song: 100000,
   successCode: 200,
+  cookie: 'MUSIC_U=',
   sortList: [
     {
       name: '最热',
       id: 'hot',
     },
-    {
-      name: '最新',
-      id: 'new',
-    },
+    // {
+    //   name: '最新',
+    //   id: 'new',
+    // },
   ],
   regExps: {
     listDetailLink: /^.+(?:\?|&)id=(\d+)(?:&.*$|#.*$|$)/,
+    listDetailLink2: /^.+\/playlist\/(\d+)\/\d+\/.+$/,
   },
   /**
    * 格式化播放数量
@@ -49,28 +51,50 @@ export default {
 
   async handleParseId(link, retryNum = 0) {
     if (this._requestObj_listDetailLink) this._requestObj_listDetailLink.cancelHttp()
-    if (retryNum > 2) return Promise.reject(new Error('link try max num'))
+    if (retryNum > 2) throw new Error('link try max num')
 
     this._requestObj_listDetailLink = httpFetch(link)
     const { headers: { location }, statusCode } = await this._requestObj_listDetailLink.promise
     // console.log(headers)
     if (statusCode > 400) return this.handleParseId(link, ++retryNum)
-    return location == null ? link : location
+    const url = location == null ? link : location
+    return this.regExps.listDetailLink.test(url)
+      ? url.replace(this.regExps.listDetailLink, '$1')
+      : url.replace(this.regExps.listDetailLink2, '$1')
   },
 
-  async getListDetail(id, page, tryNum = 0) { // 获取歌曲列表内的音乐
+  async getListId(id) {
+    let cookie
+    if (/###/.test(id)) {
+      const [url, token] = id.split('###')
+      id = url
+      cookie = `MUSIC_U=${token}`
+    }
+    if ((/[?&:/]/.test(id))) {
+      if (this.regExps.listDetailLink.test(id)) {
+        id = id.replace(this.regExps.listDetailLink, '$1')
+      } else if (this.regExps.listDetailLink2.test(id)) {
+        id = id.replace(this.regExps.listDetailLink2, '$1')
+      } else {
+        id = await this.handleParseId(id)
+      }
+      // console.log(id)
+    }
+    return { id, cookie }
+  },
+  async getListDetail(rawId, page, tryNum = 0) { // 获取歌曲列表内的音乐
     if (this._requestObj_listDetail) this._requestObj_listDetail.cancelHttp()
     if (tryNum > 2) return Promise.reject(new Error('try max num'))
 
-    if ((/[?&:/]/.test(id))) {
-      if (!this.regExps.listDetailLink.test(id)) id = await this.handleParseId(id)
-      // console.log(id)
-      id = id.replace(this.regExps.listDetailLink, '$1')
-    }
+    const { id, cookie } = await this.getListId(rawId)
+    if (cookie) this.cookie = cookie
 
     this._requestObj_listDetail = httpFetch('https://music.163.com/api/linux/forward', {
       method: 'post',
-      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
+        Cookie: this.cookie,
+      },
       form: linuxapi({
         method: 'POST',
         url: 'https://music.163.com/api/v3/playlist/detail',
@@ -139,6 +163,7 @@ export default {
               size,
             }
           }
+        case 192000:
         case 128000:
           if (item.l) {
             size = sizeFormate(item.l.size)
@@ -185,7 +210,7 @@ export default {
       }),
     })
     return this._requestObj_list.promise.then(({ body }) => {
-      // console.log(JSON.stringify(body))
+      // console.log(body)
       if (body.code !== this.successCode) return this.getList(sortId, tagId, page, ++tryNum)
       return {
         list: this.filterList(body.playlists),
@@ -272,6 +297,11 @@ export default {
 
   getTags() {
     return Promise.all([this.getTag(), this.getHotTag()]).then(([tags, hotTag]) => ({ tags, hotTag, source: 'wy' }))
+  },
+
+  async getDetailPageUrl(rawId) {
+    const { id } = await this.getListId(rawId)
+    return `https://music.163.com/#/playlist?id=${id}`
   },
 }
 

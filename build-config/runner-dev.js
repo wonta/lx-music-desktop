@@ -16,7 +16,8 @@ const rendererLyricConfig = require('./renderer-lyric/webpack.config.dev')
 
 let electronProcess = null
 let manualRestart = false
-let hotMiddleware
+let hotMiddlewareRenderer
+let hotMiddlewareRendererLyric
 
 
 function startRenderer() {
@@ -24,7 +25,7 @@ function startRenderer() {
     // rendererConfig.entry.renderer = [path.join(__dirname, 'dev-client')].concat(rendererConfig.entry.renderer)
     // rendererConfig.mode = 'development'
     const compiler = webpack(rendererConfig)
-    hotMiddleware = webpackHotMiddleware(compiler, {
+    hotMiddlewareRenderer = webpackHotMiddleware(compiler, {
       log: false,
       heartbeat: 2500,
     })
@@ -32,37 +33,36 @@ function startRenderer() {
     compiler.hooks.compilation.tap('compilation', compilation => {
       // console.log(Object.keys(compilation.hooks))
       HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync('html-webpack-plugin-after-emit', (data, cb) => {
-        hotMiddleware.publish({ action: 'reload' })
+        hotMiddlewareRenderer.publish({ action: 'reload' })
         cb()
       })
     })
 
-    compiler.hooks.done.tap('done', stats => {
-      // logStats('Renderer', 'Compile done')
-      // logStats('Renderer', stats)
-    })
+    // compiler.hooks.done.tap('done', stats => {
+    //   // logStats('Renderer', 'Compile done')
+    //   // logStats('Renderer', stats)
+    // })
 
-    const server = new WebpackDevServer(
-      compiler,
-      {
-        contentBase: path.join(__dirname, '../'),
-        quiet: true,
-        hot: true,
-        historyApiFallback: true,
-        clientLogLevel: 'warning',
-        overlay: {
-          errors: true,
-        },
-        before(app, ctx) {
-          app.use(hotMiddleware)
-          ctx.middleware.waitUntilValid(() => {
-            resolve()
-          })
-        },
+    const server = new WebpackDevServer({
+      port: 9080,
+      hot: true,
+      historyApiFallback: true,
+      // static: {
+      //   directory: path.join(__dirname, '../'),
+      // },
+      client: {
+        logging: 'warn',
+        overlay: true,
       },
-    )
+      setupMiddlewares(middlewares, devServer) {
+        devServer.app.use(hotMiddlewareRenderer)
+        devServer.middleware.waitUntilValid(resolve)
 
-    server.listen(9080)
+        return middlewares
+      },
+    }, compiler)
+
+    server.start()
   })
 }
 
@@ -71,7 +71,7 @@ function startRendererLyric() {
     // rendererConfig.entry.renderer = [path.join(__dirname, 'dev-client')].concat(rendererConfig.entry.renderer)
     // rendererConfig.mode = 'development'
     const compiler = webpack(rendererLyricConfig)
-    hotMiddleware = webpackHotMiddleware(compiler, {
+    hotMiddlewareRendererLyric = webpackHotMiddleware(compiler, {
       log: false,
       heartbeat: 2500,
     })
@@ -79,37 +79,35 @@ function startRendererLyric() {
     compiler.hooks.compilation.tap('compilation', compilation => {
       // console.log(Object.keys(compilation.hooks))
       HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync('html-webpack-plugin-after-emit', (data, cb) => {
-        hotMiddleware.publish({ action: 'reload' })
+        hotMiddlewareRendererLyric.publish({ action: 'reload' })
         cb()
       })
     })
 
-    compiler.hooks.done.tap('done', stats => {
-      // logStats('Renderer', 'Compile done')
-      // logStats('Renderer', stats)
-    })
+    // compiler.hooks.done.tap('done', stats => {
+    //   // logStats('Renderer', 'Compile done')
+    //   // logStats('Renderer', stats)
+    // })
 
-    const server = new WebpackDevServer(
-      compiler,
-      {
-        contentBase: path.join(__dirname, '../'),
-        quiet: true,
-        hot: true,
-        historyApiFallback: true,
-        clientLogLevel: 'warning',
-        overlay: {
-          errors: true,
-        },
-        before(app, ctx) {
-          app.use(hotMiddleware)
-          ctx.middleware.waitUntilValid(() => {
-            resolve()
-          })
-        },
+    const server = new WebpackDevServer({
+      port: 9081,
+      hot: true,
+      historyApiFallback: true,
+      // static: {
+      //   directory: path.join(__dirname, '../'),
+      // },
+      client: {
+        logging: 'warn',
+        overlay: true,
       },
-    )
+      setupMiddlewares(middlewares, devServer) {
+        devServer.app.use(hotMiddlewareRenderer)
+        devServer.middleware.waitUntilValid(resolve)
+        return middlewares
+      },
+    }, compiler)
 
-    server.listen(9081)
+    server.start()
   })
 }
 
@@ -120,7 +118,8 @@ function startMain() {
     const compiler = webpack(mainConfig)
 
     compiler.hooks.watchRun.tapAsync('watch-run', (compilation, done) => {
-      hotMiddleware.publish({ action: 'compiling' })
+      hotMiddlewareRenderer.publish({ action: 'compiling' })
+      hotMiddlewareRendererLyric.publish({ action: 'compiling' })
       done()
     })
 
@@ -200,8 +199,14 @@ function init() {
   }
 
   Promise.all([
-    startRenderer().then(() => handleSuccess('renderer')).catch(() => handleFail('renderer')),
-    startRendererLyric().then(() => handleSuccess('renderer-lyric')).catch(() => handleFail('renderer-lyric')),
+    startRenderer().then(() => handleSuccess('renderer')).catch((err) => {
+      console.error(err.message)
+      return handleFail('renderer')
+    }),
+    startRendererLyric().then(() => handleSuccess('renderer-lyric')).catch((err) => {
+      console.error(err.message)
+      return handleFail('renderer-lyric')
+    }),
     startMain().then(() => handleSuccess('main')).catch(() => handleFail('main')),
   ]).then(startElectron).catch(err => {
     console.error(err)

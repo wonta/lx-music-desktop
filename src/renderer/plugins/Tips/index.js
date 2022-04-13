@@ -1,19 +1,28 @@
 import tips from './Tips'
 import { debounce } from '../../utils'
+import { base as eventBaseName } from '@renderer/event/names'
 
 let instance
 let prevTips
+let prevX = 0
+let prevY = 0
+let isDraging = false
+
+const getTipText = el => {
+  return el.getAttribute('aria-label') && el.getAttribute('ignore-tip') == null ? el.getAttribute('aria-label') : null
+}
 
 const getTips = el =>
   el
-    ? el.getAttribute('tips')
-      ? el.getAttribute('tips')
+    ? getTipText(el)
+      ? getTipText(el)
       : el.parentNode === document.documentElement
         ? null
         : getTips(el.parentNode)
     : null
 
 const showTips = debounce(event => {
+  if (isDraging) return
   let msg = getTips(event.target)
   if (!msg) return
   prevTips = msg
@@ -24,11 +33,12 @@ const showTips = debounce(event => {
       top: event.y + 12,
       left: event.x + 8,
     },
-  })
-  instance.$on('beforeClose', closeInstance => {
-    if (instance !== closeInstance) return
-    prevTips = null
-    instance = null
+  }, {
+    beforeClose(closeInstance) {
+      if (instance !== closeInstance) return
+      prevTips = null
+      instance = null
+    },
   })
 }, 400)
 
@@ -43,6 +53,7 @@ const setTips = tips => {
 }
 
 const updateTips = event => {
+  if (isDraging) return
   if (!instance) return showTips(event)
   setTimeout(() => {
     let msg = getTips(event.target)
@@ -53,6 +64,9 @@ const updateTips = event => {
 }
 
 document.body.addEventListener('mousemove', event => {
+  if ((event.x == prevX && event.y == prevY) || isDraging) return
+  prevX = event.x
+  prevY = event.y
   hideTips()
   showTips(event)
 })
@@ -60,3 +74,14 @@ document.body.addEventListener('mousemove', event => {
 document.body.addEventListener('click', updateTips)
 
 document.body.addEventListener('contextmenu', updateTips)
+
+window.eventHub.on(eventBaseName.focus, () => {
+  hideTips()
+})
+window.eventHub.on(eventBaseName.dragStart, () => {
+  isDraging = true
+  hideTips()
+})
+window.eventHub.on(eventBaseName.dragEnd, () => {
+  isDraging = false
+})

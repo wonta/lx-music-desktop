@@ -1,5 +1,6 @@
 <template lang="pug">
-div(:class="[$style.lyric, { [$style.draging]: lyricEvent.isMsDown }, { [$style.lrcActiveZoom]: lrcConfig.style.isZoomActiveLrc } ]" :style="lrcStyles" @wheel="handleWheel" @mousedown="handleLyricMouseDown" ref="dom_lyric")
+div(:class="[$style.lyric, { [$style.draging]: lyricEvent.isMsDown }, { [$style.lrcActiveZoom]: lrcConfig.style.isZoomActiveLrc } ]"
+  :style="lrcStyles" @wheel="handleWheel" @mousedown="handleLyricMouseDown" @touchstart="handleLyricTouchStart" ref="dom_lyric")
   div(:class="$style.lyricSpace")
   div(:class="[$style.lyricText]" ref="dom_lyric_text")
   //- div(v-for="(info, index) in lyricLines" :key="index" :class="[$style.lineContent, lyric.line == index ? (lrcConfig.style.isZoomActiveLrc ? $style.lrcActiveZoom : $style.lrcActive) : null]")
@@ -8,11 +9,12 @@ div(:class="[$style.lyric, { [$style.draging]: lyricEvent.isMsDown }, { [$style.
 </template>
 
 <script>
-import { rendererOn, rendererSend, NAMES } from '../../../common/ipc'
-import { scrollTo } from '../../../renderer/utils'
+import { rendererOn, rendererSend, NAMES } from '@common/ipc'
+import { scrollTo } from '@renderer/utils'
 import Lyric from '@renderer/utils/lyric-font-player'
 
 let cancelScrollFn = null
+let delayScrollTimeout
 
 export default {
   props: {
@@ -20,7 +22,9 @@ export default {
       type: Object,
       default() {
         return {
+          isDelayScroll: true,
           style: {
+            font: '',
             fontSize: 125,
             opacity: 80,
             isZoomActiveLrc: true,
@@ -77,6 +81,7 @@ export default {
   computed: {
     lrcStyles() {
       return {
+        fontFamily: this.lrcConfig.style.font,
         fontSize: this.lrcConfig.style.fontSize / 100 + 'rem',
         opacity: this.lrcConfig.style.opacity / 100,
       }
@@ -119,10 +124,18 @@ export default {
       immediate: true,
     },
     'lyric.line': {
-      handler(n) {
+      handler(n, o) {
         if (n < 0) return
         if (n == 0 && this.isSetedLines) return this.isSetedLines = false
-        this.handleScrollLrc()
+        if (o == null || n - o != 1) return this.handleScrollLrc()
+        if (this.lrcConfig.isDelayScroll) {
+          delayScrollTimeout = setTimeout(() => {
+            delayScrollTimeout = null
+            this.handleScrollLrc(600)
+          }, 600)
+        } else {
+          this.handleScrollLrc()
+        }
       },
       immediate: true,
     },
@@ -159,18 +172,21 @@ export default {
         this.lyric.lines = lines
         this.lyric.line = 0
       },
-      offset: 100,
     })
   },
   mounted() {
     document.addEventListener('mousemove', this.handleMouseMsMove)
     document.addEventListener('mouseup', this.handleMouseMsUp)
+    document.addEventListener('touchmove', this.handleTouchMove)
+    document.addEventListener('touchend', this.handleMouseMsUp)
     rendererSend(NAMES.winLyric.get_lyric_info, 'info')
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.clearLyricScrollTimeout()
     document.removeEventListener('mousemove', this.handleMouseMsMove)
     document.removeEventListener('mouseup', this.handleMouseMsUp)
+    document.removeEventListener('touchmove', this.handleTouchMove)
+    document.removeEventListener('touchend', this.handleMouseMsUp)
   },
   methods: {
     handleSetInfo({ type, data }) {
@@ -190,6 +206,13 @@ export default {
           this.isPlay = false
           window.lrc.pause()
           break
+        case 'stop':
+          this.isPlay = false
+          this.lyrics.lyric = ''
+          this.lyrics.tlyric = ''
+          this.lyrics.lxlyric = ''
+          this.setLyric()
+          break
         case 'info':
           // console.log('info', data)
           this.lyrics.lyric = data.lrc
@@ -198,7 +221,9 @@ export default {
           this.setLyric()
           this.$nextTick(() => {
             this.lyric.line = data.line
-            rendererSend(NAMES.winLyric.get_lyric_info, 'status')
+            setTimeout(() => {
+              rendererSend(NAMES.winLyric.get_lyric_info, 'status')
+            })
           })
         case 'music_info':
           this.musicInfo.name = data.name
@@ -222,7 +247,7 @@ export default {
     handleResize() {
       this.setProgressWidth()
     },
-    handleScrollLrc() {
+    handleScrollLrc(duration = 300) {
       if (!this.dom_lines.length) return
       if (cancelScrollFn) {
         cancelScrollFn()
@@ -230,51 +255,65 @@ export default {
       }
       if (this.lyricEvent.isStopScroll) return
       let dom_p = this.dom_lines[this.lyric.line]
-      cancelScrollFn = scrollTo(this.$refs.dom_lyric, dom_p ? (dom_p.offsetTop - this.$refs.dom_lyric.clientHeight * 0.5 + dom_p.clientHeight / 2) : 0)
+      cancelScrollFn = scrollTo(this.$refs.dom_lyric, dom_p ? (dom_p.offsetTop - this.$refs.dom_lyric.clientHeight * 0.5 + dom_p.clientHeight / 2) : 0, duration)
     },
-    handleLyricMouseDown(e) {
-      if (e.target.classList.contains('font') ||
-        e.target.parentNode.classList.contains('font') ||
-        e.target.classList.contains('translation') ||
-        e.target.parentNode.classList.contains('translation')) {
+    handleLyricDown(target, x, y) {
+      if (target.classList.contains('font') ||
+        target.parentNode.classList.contains('font') ||
+        target.classList.contains('translation') ||
+        target.parentNode.classList.contains('translation')) {
         this.lyricEvent.isMsDown = true
-        this.lyricEvent.msDownY = e.clientY
+        this.lyricEvent.msDownY = y
         this.lyricEvent.msDownScrollY = this.$refs.dom_lyric.scrollTop
       } else {
+        if (delayScrollTimeout) {
+          clearTimeout(delayScrollTimeout)
+          delayScrollTimeout = null
+        }
         this.winEvent.isMsDown = true
-        this.winEvent.msDownX = e.clientX
-        this.winEvent.msDownY = e.clientY
+        this.winEvent.msDownX = x
+        this.winEvent.msDownY = y
+      }
+    },
+    handleLyricMouseDown(e) {
+      this.handleLyricDown(e.target, e.clientX, e.clientY)
+    },
+    handleLyricTouchStart(e) {
+      if (e.changedTouches.length) {
+        const touch = e.changedTouches[0]
+        this.handleLyricDown(e.target, touch.clientX, touch.clientY)
       }
     },
     handleMouseMsUp(e) {
       this.lyricEvent.isMsDown = false
       this.winEvent.isMsDown = false
     },
-    handleMouseMsMove(e) {
+    handleMove(x, y) {
       if (this.lyricEvent.isMsDown) {
         if (!this.lyricEvent.isStopScroll) this.lyricEvent.isStopScroll = true
         if (cancelScrollFn) {
           cancelScrollFn()
           cancelScrollFn = null
         }
-        this.$refs.dom_lyric.scrollTop = this.lyricEvent.msDownScrollY + this.lyricEvent.msDownY - e.clientY
+        this.$refs.dom_lyric.scrollTop = this.lyricEvent.msDownScrollY + this.lyricEvent.msDownY - y
         this.startLyricScrollTimeout()
       } else if (this.winEvent.isMsDown) {
         rendererSend(NAMES.winLyric.set_win_bounds, {
-          x: e.clientX - this.winEvent.msDownX,
-          y: e.clientY - this.winEvent.msDownY,
+          x: x - this.winEvent.msDownX,
+          y: y - this.winEvent.msDownY,
           w: window.innerWidth,
           h: window.innerHeight,
         })
       }
-
-      // if (this.volumeEvent.isMsDown) {
-      //   let val = this.volumeEvent.msDownValue + (e.clientX - this.volumeEvent.msDownX) / 70
-      //   this.volume = val < 0 ? 0 : val > 1 ? 1 : val
-      //   if (this.audio) this.audio.volume = this.volume
-      // }
-
-      // console.log(val)
+    },
+    handleTouchMove(e) {
+      if (e.changedTouches.length) {
+        const touch = e.changedTouches[0]
+        this.handleMove(touch.clientX, touch.clientY)
+      }
+    },
+    handleMouseMsMove(e) {
+      this.handleMove(e.clientX, e.clientY)
     },
     startLyricScrollTimeout() {
       this.clearLyricScrollTimeout()
@@ -315,7 +354,7 @@ export default {
 </script>
 
 <style lang="less" module>
-@import '../../assets/styles/layout.less';
+@import '@lyric/assets/styles/layout.less';
 
 .lyric {
   text-align: center;
@@ -323,6 +362,7 @@ export default {
   overflow: hidden;
   font-size: 16px;
   color: @color-theme-lyric;
+  contain: strict;
   cursor: move;
 
   :global {
@@ -436,7 +476,7 @@ export default {
     .lrc-content {
       &.active {
         .translation {
-          font-size: 1em;
+          font-size: .94em;
         }
         span {
           font-size: 1.2em;

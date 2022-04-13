@@ -1,7 +1,7 @@
 const path = require('path')
 const { BrowserWindow } = require('electron')
 const { winLyric: WIN_LYRIC_EVENT_NAME } = require('../../events/_name')
-const { debounce } = require('../../../common/utils')
+const { debounce, isLinux } = require('../../../common/utils')
 const { getLyricWindowBounds } = require('./utils')
 
 require('./event')
@@ -27,7 +27,7 @@ const setLyricsConfig = debounce(config => {
 const winEvent = lyricWindow => {
   // let bounds
   // lyricWindow.on('close', event => {
-  //   if (global.isQuitting || !global.appSetting.tray.isToTray || (!isWin && !global.isTrafficLightClose)) {
+  //   if (global.isQuitting || !global.appSetting.tray.isShow || (!isWin && !global.isTrafficLightClose)) {
   //     lyricWindow.setProgressBar(-1)
   //     return
   //   }
@@ -65,6 +65,10 @@ const winEvent = lyricWindow => {
     lyricWindow.show()
     if (global.appSetting.desktopLyric.isLock) {
       global.modules.lyricWindow.setIgnoreMouseEvents(true, { forward: false })
+    }
+    // linux下每次重开时貌似要重新设置置顶
+    if (isLinux && global.appSetting.desktopLyric.isAlwaysOnTop) {
+      global.modules.lyricWindow.setAlwaysOnTop(global.appSetting.desktopLyric.isAlwaysOnTop, 'screen-saver')
     }
   })
 }
@@ -109,9 +113,10 @@ const createWindow = () => {
     alwaysOnTop: isAlwaysOnTop,
     skipTaskbar: true,
     webPreferences: {
-      // contextIsolation: true,
+      contextIsolation: false,
       webSecurity: !global.isDev,
       nodeIntegration: true,
+      spellcheck: false, // 禁用拼写检查器
     },
   })
 

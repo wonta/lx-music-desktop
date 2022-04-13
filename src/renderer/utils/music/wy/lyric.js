@@ -50,10 +50,10 @@ export default songmid => {
     }),
   })
   requestObj.promise = requestObj.promise.then(({ body }) => {
-    if (body.code !== 200) return Promise.reject('获取歌词失败')
+    if (body.code !== 200 || !body?.lrc?.lyric) return Promise.reject(new Error('Get lyric failed'))
     return {
       lyric: body.lrc.lyric,
-      tlyric: body.tlyric.lyric,
+      tlyric: body.tlyric?.lyric ?? '',
       // lxlyric: parseLyric(body.klyric.lyric),
     }
   })

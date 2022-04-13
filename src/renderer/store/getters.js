@@ -1,14 +1,25 @@
 import music from '../utils/music'
+import { themes, windowSizeList, themeShouldUseDarkColors } from '@renderer/core/share'
 
 export default {
   theme(state) {
-    let theme = state.themes.find(theme => theme.id == state.setting.themeId)
-    return (theme && theme.class) || ''
+    const themeId = state.setting.theme.id == 'auto'
+      ? themeShouldUseDarkColors.value
+        ? state.setting.theme.darkId
+        : state.setting.theme.lightId
+      : state.setting.theme.id
+    let theme = themes.find(theme => theme.id == themeId) ?? themes[0]
+    return theme.className
+  },
+  font(state) {
+    return state.setting.font
   },
   themes(state) {
     return {
-      active: state.setting.themeId,
-      list: state.themes,
+      active: state.setting.theme.id,
+      lightId: state.setting.theme.lightId,
+      darkId: state.setting.theme.darkId,
+      list: themes,
     }
   },
   source(state) {
@@ -22,7 +33,7 @@ export default {
     }
   },
   sourceNames(state) {
-    let prefix = 'store.state.source_'
+    let prefix = 'source_'
     if (state.setting.sourceNameType == 'alias') prefix += 'alias_'
     const sources = {}
     for (const source of music.sources) {
@@ -46,10 +57,16 @@ export default {
   route(state) {
     return state.route
   },
-  windowSizeList(state) {
-    return state.windowSizeList
+  windowSizeList() {
+    return windowSizeList
   },
   windowSizeActive(state) {
-    return state.windowSizeList.find(i => i.id === state.setting.windowSizeId) || state.windowSizeList[0]
+    return windowSizeList.find(i => i.id === state.setting.windowSizeId) || windowSizeList[0]
+  },
+  pactModalVisible(state) {
+    return !state.setting.isAgreePact
+  },
+  isShowAnimation(state) {
+    return state.setting.isShowAnimation
   },
 }

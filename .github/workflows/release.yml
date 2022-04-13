@@ -16,7 +16,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '12.x'
+          node-version: '14'
 
       - name: Cache file
         uses: actions/cache@v2
@@ -38,13 +38,21 @@ jobs:
 
       - name: Release package
         run: |
-          npm run publish:win:setup:always
+          npm run publish:win:setup:x64:always
+          npm run publish:win:setup:x86
+          npm run publish:win:setup:arm64
+          npm run publish:win:setup:x86_64
           npm run publish:win:7z:x64
           npm run publish:win:7z:x86
           npm run publish:win:7z:arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BT_TOKEN: ${{ secrets.BT_TOKEN }}
+
+      - name: Generate file MD5
+        run: |
+          cd build
+          Get-FileHash *.exe,*.7z -Algorithm MD5 | Format-List
 
   Mac:
     name: Mac
@@ -56,7 +64,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '12.x'
+          node-version: '14'
 
       - name: Cache file
         uses: actions/cache@v2
@@ -77,12 +85,19 @@ jobs:
         run: npm run build:src
 
       - name: Release package
-        run: npm run publish:mac:dmg:always
+        run: |
+          npm run publish:mac:dmg:always
+          npm run publish:mac:dmg:arm64
         env:
           ELECTRON_CACHE: $HOME/.cache/electron
           ELECTRON_BUILDERCACHE: $HOME/.cache/electron-builder
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BT_TOKEN: ${{ secrets.BT_TOKEN }}
+
+      - name: Generate file MD5
+        run: |
+          cd build
+          md5 *.dmg
 
   Linux:
     name: Linux
@@ -97,7 +112,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '12.x'
+          node-version: '14'
 
       - name: Cache file
         uses: actions/cache@v2
@@ -129,3 +144,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BT_TOKEN: ${{ secrets.BT_TOKEN }}
+
+      - name: Generate file MD5
+        run: |
+          cd build
+          md5sum *.deb *.rpm *.pacman *.AppImage

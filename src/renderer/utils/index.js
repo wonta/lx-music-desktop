@@ -2,7 +2,12 @@ import fs from 'fs'
 import path from 'path'
 import { shell, clipboard } from 'electron'
 import crypto from 'crypto'
-import { rendererSend, rendererInvoke, NAMES } from '../../common/ipc'
+import { rendererSend, rendererInvoke, NAMES } from '@common/ipc'
+import { log } from '@common/utils'
+import iconv from 'iconv-lite'
+import { gzip, gunzip } from 'zlib'
+import { proxy, qualityList } from '@renderer/core/share'
+
 
 /**
  * 获取两个数之间的随机整数，大于等于min，小于max
@@ -43,11 +48,11 @@ export const dateFormat = (date = new Date(), format = 'YYYY-MM-DD hh:mm:ss') =>
 export const dateFormat2 = time => {
   let differ = parseInt((Date.now() - time) / 1000)
   if (differ < 60) {
-    return window.i18n.t('base.date_format_second', { num: differ })
+    return window.i18n.t('date_format_second', { num: differ })
   } else if (differ < 3600) {
-    return window.i18n.t('base.date_format_minute', { num: parseInt(differ / 60) })
+    return window.i18n.t('date_format_minute', { num: parseInt(differ / 60) })
   } else if (differ < 86400) {
-    return window.i18n.t('base.date_format_hour', { num: parseInt(differ / 3600) })
+    return window.i18n.t('date_format_hour', { num: parseInt(differ / 3600) })
   } else {
     return dateFormat(time)
   }
@@ -80,7 +85,7 @@ const encodeNames = {
   '&apos;': "'",
   '&#039;': "'",
 }
-export const decodeName = (str = '') => str.replace(/(?:&amp;|&lt;|&gt;|&quot;|&apos;|&#039;)/gm, s => encodeNames[s])
+export const decodeName = (str = '') => str?.replace(/(?:&amp;|&lt;|&gt;|&quot;|&apos;|&#039;)/gm, s => encodeNames[s]) || ''
 
 const easeInOutQuad = (t, b, c, d) => {
   t /= d / 2
@@ -88,7 +93,7 @@ const easeInOutQuad = (t, b, c, d) => {
   t--
   return (-c / 2) * (t * (t - 2) - 1) + b
 }
-const handleScroll = (element, to, duration = 300, fn = () => {}) => {
+const handleScrollY = (element, to, duration = 300, fn = () => {}) => {
   if (!element) return fn()
   const start = element.scrollTop || element.scrollY || 0
   let cancel = false
@@ -143,10 +148,72 @@ export const scrollTo = (element, to, duration = 300, fn = () => {}, delay = 0) 
     }
     timeout = setTimeout(() => {
       timeout = null
-      scrollCancelFn = handleScroll(element, to, duration, fn, delay)
+      scrollCancelFn = handleScrollY(element, to, duration, fn, delay)
     }, delay)
   } else {
-    cancelFn = handleScroll(element, to, duration, fn, delay)
+    cancelFn = handleScrollY(element, to, duration, fn, delay)
+  }
+  return cancelFn
+}
+const handleScrollX = (element, to, duration = 300, fn = () => {}) => {
+  if (!element) return fn()
+  const start = element.scrollLeft || element.scrollX || 0
+  let cancel = false
+  if (to > start) {
+    let maxScrollLeft = element.scrollWidth - element.clientWidth
+    if (to > maxScrollLeft) to = maxScrollLeft
+  } else if (to < start) {
+    if (to < 0) to = 0
+  } else return fn()
+  const change = to - start
+  const increment = 10
+  if (!change) return fn()
+
+  let currentTime = 0
+  let val
+
+  const animateScroll = () => {
+    currentTime += increment
+    val = parseInt(easeInOutQuad(currentTime, start, change, duration))
+    if (element.scrollTo) {
+      element.scrollTo(val, 0)
+    } else {
+      element.scrollLeft = val
+    }
+    if (currentTime < duration) {
+      if (cancel) return fn()
+      setTimeout(animateScroll, increment)
+    } else {
+      fn()
+    }
+  }
+  animateScroll()
+  return () => {
+    cancel = true
+  }
+}
+/**
+ * 设置滚动条位置
+ * @param {*} element 要设置滚动的容器 dom
+ * @param {*} to 滚动的目标位置
+ * @param {*} duration 滚动完成时间 ms
+ * @param {*} fn 滚动完成后的回调
+ * @param {*} delay 延迟执行时间
+ */
+export const scrollXTo = (element, to, duration = 300, fn = () => {}, delay = 0) => {
+  let cancelFn
+  let timeout
+  if (delay) {
+    let scrollCancelFn
+    cancelFn = () => {
+      timeout == null ? scrollCancelFn && scrollCancelFn() : clearTimeout(timeout)
+    }
+    timeout = setTimeout(() => {
+      timeout = null
+      scrollCancelFn = handleScrollX(element, to, duration, fn, delay)
+    }, delay)
+  } else {
+    cancelFn = handleScrollX(element, to, duration, fn, delay)
   }
   return cancelFn
 }
@@ -276,11 +343,22 @@ export const setMeta = (filePath, meta) => {
  * 保存歌词文件
  * @param {*} filePath
  * @param {*} lrc
+ * @param {*} format
  */
-export const saveLrc = (filePath, lrc) => {
-  fs.writeFile(filePath, lrc, 'utf8', err => {
-    if (err) console.log(err)
-  })
+export const saveLrc = (filePath, lrc, format) => {
+  switch (format) {
+    case 'gbk':
+      fs.writeFile(filePath, iconv.encode(lrc, 'gbk', { addBOM: true }), err => {
+        if (err) console.log(err)
+      })
+      break
+    case 'utf8':
+    default:
+      fs.writeFile(filePath, lrc, 'utf8', err => {
+        if (err) console.log(err)
+      })
+      break
+  }
 }
 
 /**
@@ -371,12 +449,16 @@ export const clearCache = () => rendererInvoke(NAMES.mainWindow.clear_cache)
 export const setWindowSize = (width, height) => rendererSend(NAMES.mainWindow.set_window_size, { width, height })
 
 
-export const getProxyInfo = () => window.globalObj.proxy.enable && window.globalObj.proxy.host
-  ? `http://${window.globalObj.proxy.username}:${window.globalObj.proxy.password}@${window.globalObj.proxy.host}:${window.globalObj.proxy.port};`
-  : undefined
+export const getProxyInfo = () => {
+  return proxy.enable && proxy.host
+    ? `http://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.port};`
+    : proxy.envProxy
+      ? `http://${proxy.envProxy.host}:${proxy.envProxy.port};`
+      : undefined
+}
 
 
-export const assertApiSupport = source => window.globalObj.qualityList[source] != undefined
+export const assertApiSupport = source => qualityList.value[source] != undefined
 
 export const getSetting = () => rendererInvoke(NAMES.mainWindow.get_setting)
 export const saveSetting = setting => rendererInvoke(NAMES.mainWindow.set_app_setting, setting)
@@ -386,8 +468,8 @@ export const getPlayList = () => rendererInvoke(NAMES.mainWindow.get_playlist).c
     let filePath = path.join(dataPath, 'playList.json.bak')
     rendererInvoke(NAMES.mainWindow.show_dialog, {
       type: 'error',
-      message: window.i18n.t('store.state.load_list_file_error_title'),
-      detail: window.i18n.t('store.state.load_list_file_error_detail', {
+      message: window.i18n.t('load_list_file_error_title'),
+      detail: window.i18n.t('load_list_file_error_detail', {
         path: filePath,
         detail: error.message,
       }),
@@ -421,3 +503,81 @@ export const setMusicUrl = (musicInfo, type, url) => rendererSend(NAMES.mainWind
   url,
 })
 export const clearMusicUrl = () => rendererSend(NAMES.mainWindow.clear_music_url)
+
+export const gzipData = str => {
+  return new Promise((resolve, reject) => {
+    gzip(str, (err, result) => {
+      if (err) return reject(err)
+      resolve(result)
+    })
+  })
+}
+export const gunzipData = buf => {
+  return new Promise((resolve, reject) => {
+    gunzip(buf, (err, result) => {
+      if (err) return reject(err)
+      resolve(result.toString())
+    })
+  })
+}
+
+export const saveLxConfigFile = async(path, data) => {
+  if (!path.endsWith('.lxmc')) path += '.lxmc'
+  fs.writeFile(path, await gzipData(JSON.stringify(data)), 'binary', err => {
+    console.log(err)
+  })
+}
+
+export const readLxConfigFile = async path => {
+  let isJSON = path.endsWith('.json')
+  let data = await fs.promises.readFile(path, isJSON ? 'utf8' : 'binary')
+  if (!data || isJSON) return data
+  data = await gunzipData(Buffer.from(data, 'binary'))
+  data = JSON.parse(data.toString('utf8'))
+
+  // 修复v1.14.0出现的导出数据被序列化两次的问题
+  if (typeof data != 'object') {
+    try {
+      data = JSON.parse(data)
+    } catch (err) {
+      return data
+    }
+  }
+
+  return data
+}
+
+export const saveStrToFile = (path, str) => new Promise((resolve, reject) => {
+  fs.writeFile(path, str, err => {
+    if (err) {
+      log.error(err)
+      reject(err)
+      return
+    }
+    resolve()
+  })
+})
+
+const fileNameRxp = /[\\/:*?#"<>|]/g
+export const filterFileName = name => name.replace(fileNameRxp, '')
+
+
+export const getFontSizeWithScreen = (screenWidth = window.innerWidth) => {
+  return screenWidth <= 1440
+    ? 16
+    : screenWidth <= 1920
+      ? 18
+      : screenWidth <= 2560
+        ? 20
+        : screenWidth <= 2560 ? 20 : 22
+}
+
+
+export const deduplicationList = list => {
+  const ids = new Set()
+  return list.filter(s => {
+    if (ids.has(s.songmid)) return false
+    ids.add(s.songmid)
+    return true
+  })
+}

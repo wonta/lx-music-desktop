@@ -2,7 +2,7 @@ const path = require('path')
 const os = require('os')
 
 const defaultSetting = {
-  version: '1.0.41',
+  version: '1.0.54',
   player: {
     togglePlayMethod: 'listLoop',
     highQuality: false,
@@ -12,8 +12,20 @@ const defaultSetting = {
     mediaDeviceId: 'default',
     isMediaDeviceRemovedStopPlay: false,
     isShowLyricTranslation: false,
+    isS2t: false, // 是否将歌词从简体转换为繁体
     isPlayLxlrc: true,
     isSavePlayTime: false,
+    audioVisualization: false,
+    waitPlayEndStop: true,
+    waitPlayEndStopTime: '',
+  },
+  playDetail: {
+    isZoomActiveLrc: true,
+    isShowLyricProgressSetting: false,
+    style: {
+      fontSize: 100,
+      align: 'center',
+    },
   },
   desktopLyric: {
     enable: false,
@@ -25,17 +37,20 @@ const defaultSetting = {
     y: null,
     theme: 0,
     isLockScreen: true,
+    isDelayScroll: true,
     style: {
+      font: '',
       fontSize: 120,
       opacity: 95,
       isZoomActiveLrc: true,
     },
   },
   list: {
+    isClickPlayList: false,
     isShowAlbumName: true,
     isShowSource: true,
-    prevSelectListId: 'default',
     isSaveScrollLocation: true,
+    addMusicLocationType: 'top',
   },
   download: {
     enable: false,
@@ -43,6 +58,7 @@ const defaultSetting = {
     fileName: '歌名 - 歌手',
     maxDownloadNum: 3,
     isDownloadLrc: false,
+    lrcFormat: 'utf8',
     isEmbedPic: true,
     isEmbedLyric: false,
     isUseOtherSource: false,
@@ -84,12 +100,21 @@ const defaultSetting = {
     isToTray: false,
     themeId: 0,
   },
+  sync: {
+    enable: false,
+    port: '23332',
+  },
   windowSizeId: 2,
-  themeId: 0,
+  theme: {
+    id: 0,
+    lightId: 0,
+    darkId: 13,
+  },
   langId: null,
   sourceId: 'kw',
   apiSource: 'temp',
   sourceNameType: 'alias',
+  font: '',
   isShowAnimation: true,
   randomAnimate: true,
   ignoreVersion: null,
@@ -102,7 +127,10 @@ const overwriteSetting = {
 }
 
 // 使用新年皮肤
-if (new Date().getMonth() < 2) defaultSetting.themeId = 9
+if (new Date().getMonth() < 2) {
+  defaultSetting.theme.id = 9
+  defaultSetting.desktopLyric.theme = 3
+}
 
 
 exports.defaultSetting = defaultSetting

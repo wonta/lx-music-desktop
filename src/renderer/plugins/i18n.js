@@ -7,16 +7,17 @@
  */
 
 // Lib imports
-import Vue from 'vue'
-import VueI18n from 'vue-i18n'
-import messages from '@renderer/lang'
+import { createI18n } from 'vue-i18n'
+import { messages } from '@/lang'
 
-Vue.use(VueI18n)
 
-const i18n = window.i18n = new VueI18n({
+const i18n = createI18n({
   locale: 'zh-cn',
   fallbackLocale: 'zh-cn',
+  allowComposition: true,
   messages,
 })
+
+window.i18n = i18n.global
 
 export default i18n

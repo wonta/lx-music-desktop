@@ -1,6 +1,6 @@
 const path = require('path')
 const webpack = require('webpack')
-const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin')
+const CssMinimizerPlugin = require('css-minimizer-webpack-plugin')
 const TerserPlugin = require('terser-webpack-plugin')
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const { merge } = require('webpack-merge')
@@ -9,7 +9,8 @@ const baseConfig = require('./webpack.config.base')
 
 const { dependencies } = require('../../package.json')
 
-let whiteListedModules = ['vue']
+// let whiteListedModules = ['vue']
+let whiteListedModules = ['vue', 'vue-router', 'vuex', 'vue-i18n']
 
 
 module.exports = merge(baseConfig, {
@@ -31,12 +32,15 @@ module.exports = merge(baseConfig, {
       'process.env': {
         NODE_ENV: '"production"',
       },
+      __VUE_OPTIONS_API__: 'true',
+      __VUE_PROD_DEVTOOLS__: 'false',
     }),
   ],
   optimization: {
+    minimize: false,
     minimizer: [
       new TerserPlugin(),
-      new OptimizeCSSAssetsPlugin({}),
+      new CssMinimizerPlugin(),
     ],
   },
   performance: {

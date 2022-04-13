@@ -1,73 +1,76 @@
 <template lang="pug">
-  div(:class="$style.search")
-    //- transition
-    div(:class="$style.header")
-      material-tab(:class="$style.tab" :list="sources" align="left" item-key="id" item-name="name" v-model="searchSourceId")
-    div(:class="$style.main")
-      div(:class="$style.list" v-show="isLoading || listInfo.list.length")
-        div(:class="$style.thead")
-          table
-            thead
-              tr
-                th.nobreak.center(style="width: 5%;") #
-                th.nobreak {{$t('view.search.name')}}
-                th.nobreak(style="width: 22%;") {{$t('view.search.singer')}}
-                th.nobreak(style="width: 22%;") {{$t('view.search.album')}}
-                th.nobreak(style="width: 8%;") {{$t('view.search.time')}}
-                th.nobreak(style="width: 13%;") {{$t('view.search.action')}}
-        div.scroll(:class="$style.tbody" ref="dom_scrollContent")
-          table
-            tbody(@contextmenu.capture="handleContextMenu" ref="dom_tbody")
-              tr(v-for='(item, index) in listInfo.list' :key='item.songmid' @contextmenu="handleListItemRigthClick($event, index)" @click="handleDoubleClick($event, index)")
-                td.nobreak.center(style="width: 5%; padding-left: 3px; padding-right: 3px;" :class="$style.noSelect" @click.stop) {{index + 1}}
-                td.break
-                  span.select {{item.name}}
-                  span.badge.badge-theme-success(:class="[$style.labelQuality, $style.noSelect]" v-if="item._types.ape || item._types.flac || item._types.wav") {{$t('material.song_list.lossless')}}
-                  span.badge.badge-theme-info(:class="[$style.labelQuality, $style.noSelect]" v-else-if="item._types['320k']") {{$t('material.song_list.high_quality')}}
-                  span(:class="[$style.labelSource, $style.noSelect]" v-if="searchSourceId == 'all'") {{item.source}}
-                td.break(style="width: 22%;")
-                  span.select {{item.singer}}
-                td.break(style="width: 22%;")
-                  span.select {{item.albumName}}
-                td(style="width: 8%;")
-                  span(:class="[$style.time, $style.noSelect]") {{item.interval || '--/--'}}
-                td(style="width: 13%; padding-left: 0; padding-right: 0;")
-                  material-list-buttons(:index="index" :remove-btn="false" :class="$style.listBtn"
-                    :play-btn="assertApiSupport(item.source)"
-                    :download-btn="assertApiSupport(item.source)"
-                    @btn-click="handleListBtnClick")
-          div(:class="$style.pagination")
-            material-pagination(:max-page="listInfo.allPage" :limit="listInfo.limit" :page="page" @btn-click="handleTogglePage")
-      transition(enter-active-class="animated-fast fadeIn" leave-active-class="animated fadeOut")
-        div(v-show="isLoading" :class="$style.loading")
-          p {{$t('view.search.loding_list')}}
-      transition(enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut")
-        div(v-show="!isLoading && !listInfo.list.length" :class="$style.noitem")
-          div.scroll(:class="$style.noitemListContainer" v-if="setting.search.isShowHotSearch || setting.search.isShowHistorySearch")
-            dl(:class="[$style.noitemList, $style.noitemHotSearchList]" v-if="setting.search.isShowHotSearch")
-              dt(:class="$style.noitemListTitle") {{$t('view.search.hot_search')}}
-              dd(:class="$style.noitemListItem" @click="handleNoitemSearch(item)" v-for="item in hotSearchList") {{item}}
-            dl(:class="$style.noitemList" v-if="setting.search.isShowHistorySearch && historyList.length")
-              dt(:class="$style.noitemListTitle")
-                span {{$t('view.search.history_search')}}
-                span(:class="$style.historyClearBtn" @click="clearHistory" :tips="$t('view.search.history_clear')")
-                  svg(version='1.1' xmlns='http://www.w3.org/2000/svg' xlink='http://www.w3.org/1999/xlink' height='100%' viewBox='0 0 512 512' space='preserve')
-                    use(xlink:href='#icon-eraser')
-              dd(:class="$style.noitemListItem" v-for="(item, index) in historyList" @contextmenu="removeHistory(index)" :key="index + item" @click="handleNoitemSearch(item)" :tips="$t('view.search.history_remove')") {{item}}
-          div(v-else :class="$style.noitem_list")
-            p {{$t('view.search.no_item')}}
-      material-menu(:menus="listItemMenu" :location="listMenu.menuLocation" item-name="name" :isShow="listMenu.isShowItemMenu" @menu-click="handleListItemMenuClick")
-    material-download-modal(:show="isShowDownload" :musicInfo="musicInfo" @select="handleAddDownload" @close="isShowDownload = false")
-    material-download-multiple-modal(:show="isShowDownloadMultiple" :list="selectedData" @select="handleAddDownloadMultiple" @close="isShowDownloadMultiple = false")
-    //- material-flow-btn(:show="isShowEditBtn && (searchSourceId == 'all' || assertApiSupport(searchSourceId))" :remove-btn="false" @btn-click="handleFlowBtnClick")
-    material-list-add-modal(:show="isShowListAdd" :musicInfo="musicInfo" @close="handleListAddModalClose")
-    material-list-add-multiple-modal(:show="isShowListAddMultiple" :musicList="selectedData" @close="handleListAddMultipleModalClose")
+div(:class="$style.search")
+  //- transition
+  div(:class="$style.header")
+    base-tab(:class="$style.tab" :list="sources" align="left" item-key="id" item-name="name" @change="handleSourceChange" v-model="searchSourceId")
+  div(:class="$style.main")
+    div(:class="$style.list" v-show="isLoading || listInfo.list.length")
+      div.thead(:class="$style.thead")
+        table
+          thead
+            tr
+              th.nobreak.center(style="width: 5%;") #
+              th.nobreak {{$t('music_name')}}
+              th.nobreak(style="width: 22%;") {{$t('music_singer')}}
+              th.nobreak(style="width: 22%;") {{$t('music_album')}}
+              th.nobreak(style="width: 8%;") {{$t('music_time')}}
+              th.nobreak(style="width: 13%;") {{$t('action')}}
+      div.scroll(:class="$style.tbody" ref="dom_scrollContent")
+        table
+          tbody(@contextmenu.capture="handleContextMenu" ref="dom_tbody")
+            tr(v-for='(item, index) in listInfo.list' :key='item.songmid' @contextmenu="handleListItemRigthClick($event, index)" @click="handleDoubleClick($event, index)")
+              td.nobreak.center(style="width: 5%; padding-left: 3px; padding-right: 3px;" :class="$style.noSelect" @click.stop) {{index + 1}}
+              td.break
+                span.select {{item.name}}
+                span.badge.badge-theme-success(:class="[$style.labelQuality, $style.noSelect]" v-if="item._types.ape || item._types.flac || item._types.wav") {{$t('tag__lossless')}}
+                span.badge.badge-theme-info(:class="[$style.labelQuality, $style.noSelect]" v-else-if="item._types['320k']") {{$t('tag__high_quality')}}
+                span(:class="[$style.labelSource, $style.noSelect]" v-if="searchSourceId == 'all'") {{item.source}}
+              td.break(style="width: 22%;")
+                span.select {{item.singer}}
+              td.break(style="width: 22%;")
+                span.select {{item.albumName}}
+              td(style="width: 8%;")
+                span(:class="[$style.time, $style.noSelect]") {{item.interval || '--/--'}}
+              td(style="width: 13%; padding-left: 0; padding-right: 0;")
+                material-list-buttons(:index="index" :remove-btn="false" :class="$style.listBtn"
+                  :play-btn="assertApiSupport(item.source)"
+                  :download-btn="assertApiSupport(item.source)"
+                  @btn-click="handleListBtnClick")
+        div(:class="$style.pagination")
+          material-pagination(:max-page="listInfo.allPage" :limit="listInfo.limit" :page="page" @btn-click="handleTogglePage")
+    transition(enter-active-class="animated-fast fadeIn" leave-active-class="animated fadeOut")
+      div(v-show="isLoading" :class="$style.loading")
+        p {{$t('list__loading')}}
+    transition(enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut")
+      div(v-show="!isLoading && !listInfo.list.length" :class="$style.noitem")
+        div.scroll(:class="$style.noitemListContainer" v-if="setting.search.isShowHotSearch || (setting.search.isShowHistorySearch && setting.search.isShowHistorySearch.length)")
+          dl(:class="[$style.noitemList, $style.noitemHotSearchList]" v-if="setting.search.isShowHotSearch")
+            dt(:class="$style.noitemListTitle") {{$t('search__hot_search')}}
+            dd(:class="$style.noitemListItem" @click="handleNoitemSearch(item)" v-for="item in hotSearchList") {{item}}
+          dl(:class="$style.noitemList" v-if="setting.search.isShowHistorySearch && historyList.length")
+            dt(:class="$style.noitemListTitle")
+              span {{$t('history_search')}}
+              span(:class="$style.historyClearBtn" @click="clearHistory" :aria-label="$t('history_clear')")
+                svg(version='1.1' xmlns='http://www.w3.org/2000/svg' xlink='http://www.w3.org/1999/xlink' height='100%' viewBox='0 0 512 512' space='preserve')
+                  use(xlink:href='#icon-eraser')
+            dd(:class="$style.noitemListItem" v-for="(item, index) in historyList" @contextmenu="removeHistory(index)" :key="index + item" @click="handleNoitemSearch(item)" :aria-label="$t('history_remove')") {{item}}
+        div(v-else :class="$style.noitem_list")
+          p {{$t('search__welcome')}}
+  //- common-flow-btn(:show="isShowEditBtn && (searchSourceId == 'all' || assertApiSupport(searchSourceId))" :remove-btn="false" @btn-click="handleFlowBtnClick")
+  common-download-modal(v-model:show="isShowDownload" :musicInfo="musicInfo" teleport="#view")
+  common-download-multiple-modal(v-model:show="isShowDownloadMultiple" :list="selectedData" @confirm="removeAllSelect" teleport="#view")
+  common-list-add-modal(v-model:show="isShowListAdd" :musicInfo="musicInfo" teleport="#view")
+  common-list-add-multiple-modal(v-model:show="isShowListAddMultiple" :musicList="selectedData" @confirm="removeAllSelect" teleport="#view")
+  base-menu(:menus="listItemMenu" :location="listMenu.menuLocation" item-name="name" :isShow="listMenu.isShowItemMenu" @menu-click="handleListItemMenuClick")
 </template>
 
 <script>
 import { mapGetters, mapActions, mapMutations } from 'vuex'
-import { scrollTo, clipboardWriteText, assertApiSupport, openUrl } from '../utils'
-import musicSdk from '../utils/music'
+import { scrollTo, clipboardWriteText, assertApiSupport, openUrl } from '@renderer/utils'
+import musicSdk from '@renderer/utils/music'
+import { defaultList } from '@renderer/core/share/list'
+import { getList } from '@renderer/core/share/utils'
+
 export default {
   name: 'Search',
   data() {
@@ -106,33 +109,51 @@ export default {
       isLoading: false,
     }
   },
-  beforeRouteUpdate(to, from, next) {
-    if (to.query.text === undefined) return
-    this.text = to.query.text
-    this.page = 1
-    this.handleSearch(this.text, this.page)
-    next()
+  beforeRouteUpdate(to, from) {
+    if (to.query.source && (this.sourceList[to.query.source] || to.query.source == 'all')) {
+      if (this.setting.search.searchSource != to.query.source) {
+        this.setSearchSource({
+          searchSource: to.query.source,
+        })
+      }
+      if (this.searchSourceId != to.query.source) {
+        this.searchSourceId = to.query.source
+      }
+      this.$nextTick(() => {
+        this.handleGetHotSearch()
+      })
+    }
+    if (to.query.text != null && this.text != to.query.text) {
+      this.text = to.query.text
+    }
+
+    this.$nextTick(() => {
+      this.page = 1
+      this.handleSearch(this.text, this.page)
+    })
   },
   created() {
     this.listenEvent()
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.unlistenEvent()
   },
   mounted() {
     // console.log('mounted')
-
-    // 处理搜索源不存在时页面报错的问题
-    if (!this.sourceList[this.setting.search.searchSource] && this.setting.search.searchSource != 'all') {
+    if (this.$route.query.source && (this.sourceList[this.$route.query.source] || this.$route.query.source == 'all')) {
+      this.setSearchSource({
+        searchSource: this.$route.query.source,
+      })
+    } else if (!this.sourceList[this.setting.search.searchSource] && this.setting.search.searchSource != 'all') { // 处理搜索源不存在时页面报错的问题
       this.setSearchSource({
         searchSource: 'kw',
       })
     }
     this.searchSourceId = this.setting.search.searchSource
-    if (this.$route.query.text === undefined) {
+    if (this.$route.query.text == null) {
       this.text = this.$store.getters['search/searchText']
       this.page = this.listInfo.page
-    } else if (this.$route.query.text === '') {
+    } else if (this.$route.query.text == '') {
       this.clearList()
     } else {
       this.text = this.$route.query.text
@@ -153,47 +174,34 @@ export default {
     'listInfo.list'() {
       this.removeAllSelect()
     },
-    searchSourceId(n) {
-      if (n === this.setting.search.searchSource) return
-      if (this.text !== '') this.isLoading = true
-      this.$nextTick(() => {
-        this.page = 1
-        this.handleSearch(this.text, this.page)
-        this.handleGetHotSearch()
-      })
-      this.setSearchSource({
-        searchSource: n,
-      })
-    },
   },
   computed: {
     ...mapGetters(['userInfo', 'setting']),
     ...mapGetters('search', ['sourceList', 'allList', 'sources', 'historyList']),
-    ...mapGetters('list', ['defaultList']),
     listItemMenu() {
       return [
         {
-          name: this.$t('view.search.list_play'),
+          name: this.$t('list__play'),
           action: 'play',
           disabled: !this.listMenu.itemMenuControl.play,
         },
         {
-          name: this.$t('view.search.list_download'),
+          name: this.$t('list__download'),
           action: 'download',
           disabled: !this.listMenu.itemMenuControl.download,
         },
         {
-          name: this.$t('view.search.list_play_later'),
+          name: this.$t('list__play_later'),
           action: 'playLater',
           disabled: !this.listMenu.itemMenuControl.playLater,
         },
         {
-          name: this.$t('view.search.list_add_to'),
+          name: this.$t('list__add_to'),
           action: 'addTo',
           disabled: !this.listMenu.itemMenuControl.addTo,
         },
         {
-          name: this.$t('view.search.list_source_detail'),
+          name: this.$t('list__source_detail'),
           action: 'sourceDetail',
           disabled: !this.listMenu.itemMenuControl.sourceDetail,
         },
@@ -205,6 +213,7 @@ export default {
     hotSearchList() {
       return this.$store.getters['hotSearch/list'][this.setting.search.searchSource] || []
     },
+
   },
   methods: {
     ...mapMutations(['setSearchSource']),
@@ -217,18 +226,18 @@ export default {
       getHotSearch: 'getList',
     }),
     listenEvent() {
-      window.eventHub.$on('key_shift_down', this.handle_key_shift_down)
-      window.eventHub.$on('key_shift_up', this.handle_key_shift_up)
-      window.eventHub.$on('key_mod_down', this.handle_key_mod_down)
-      window.eventHub.$on('key_mod_up', this.handle_key_mod_up)
-      window.eventHub.$on('key_mod+a_down', this.handle_key_mod_a_down)
+      window.eventHub.on('key_shift_down', this.handle_key_shift_down)
+      window.eventHub.on('key_shift_up', this.handle_key_shift_up)
+      window.eventHub.on('key_mod_down', this.handle_key_mod_down)
+      window.eventHub.on('key_mod_up', this.handle_key_mod_up)
+      window.eventHub.on('key_mod+a_down', this.handle_key_mod_a_down)
     },
     unlistenEvent() {
-      window.eventHub.$off('key_shift_down', this.handle_key_shift_down)
-      window.eventHub.$off('key_shift_up', this.handle_key_shift_up)
-      window.eventHub.$off('key_mod_down', this.handle_key_mod_down)
-      window.eventHub.$off('key_mod_up', this.handle_key_mod_up)
-      window.eventHub.$off('key_mod+a_down', this.handle_key_mod_a_down)
+      window.eventHub.off('key_shift_down', this.handle_key_shift_down)
+      window.eventHub.off('key_shift_up', this.handle_key_shift_up)
+      window.eventHub.off('key_mod_down', this.handle_key_mod_down)
+      window.eventHub.off('key_mod_up', this.handle_key_mod_up)
+      window.eventHub.off('key_mod+a_down', this.handle_key_mod_a_down)
     },
     handle_key_shift_down() {
       if (!this.keyEvent.isShiftDown) this.keyEvent.isShiftDown = true
@@ -312,9 +321,12 @@ export default {
             }
             this.selectedData = this.listInfo.list.slice(lastSelectIndex, clickIndex + 1)
             if (isNeedReverse) this.selectedData.reverse()
-            let nodes = this.$refs.dom_tbody.childNodes
+            let nodes = Array.from(this.$refs.dom_tbody.childNodes).filter(n => n.nodeType === 1)
             do {
-              nodes[lastSelectIndex].classList.add('active')
+              const node = nodes[lastSelectIndex]
+              if (node.tagName == 'TR') {
+                node.classList.add('active')
+              }
               lastSelectIndex++
             } while (lastSelectIndex <= clickIndex)
           }
@@ -349,12 +361,12 @@ export default {
       let targetSong = this.listInfo.list[index]
       // if (!targetSong || !this.assertApiSupport(targetSong.source)) return
       this.listAdd({ id: 'default', musicInfo: targetSong })
-      let targetIndex = this.defaultList.list.findIndex(
+      let targetIndex = getList(defaultList.id).findIndex(
         s => s.songmid === targetSong.songmid,
       )
       if (targetIndex > -1) {
         this.setList({
-          list: this.defaultList,
+          listId: defaultList.id,
           index: targetIndex,
         })
       }
@@ -362,20 +374,13 @@ export default {
     handleTogglePage(page) {
       this.handleSearch(this.text, page)
     },
-    handleAddDownload(type) {
-      this.createDownload({ musicInfo: this.musicInfo, type })
-      this.isShowDownload = false
-    },
-    handleAddDownloadMultiple(type) {
-      this.createDownloadMultiple({ list: this.filterList(this.selectedData), type })
-      this.removeAllSelect()
-      this.isShowDownloadMultiple = false
-    },
     handleSelectAllData() {
       this.removeAllSelect()
       this.selectedData = [...this.listInfo.list]
       let nodes = this.$refs.dom_tbody.childNodes
+      // console.log(nodes)
       for (const node of nodes) {
+        if (node.tagName != 'TR') continue
         node.classList.add('active')
       }
     },
@@ -400,13 +405,6 @@ export default {
           ? [...list]
           : []
     },
-    handleListAddModalClose() {
-      this.isShowListAdd = false
-    },
-    handleListAddMultipleModalClose(isClearSelect) {
-      if (isClearSelect) this.removeAllSelect()
-      this.isShowListAddMultiple = false
-    },
     handleContextMenu(event) {
       if (!event.target.classList.contains('select')) return
       event.stopImmediatePropagation()
@@ -425,7 +423,7 @@ export default {
       this.getHotSearch(this.setting.search.searchSource)
     },
     handleNoitemSearch(text) {
-      this.$router.push({
+      this.$router.replace({
         path: 'search',
         query: {
           text,
@@ -444,10 +442,18 @@ export default {
       let dom_selected = this.$refs.dom_tbody.querySelector('tr.selected')
       if (dom_selected) dom_selected.classList.remove('selected')
       this.$refs.dom_tbody.querySelectorAll('tr')[index].classList.add('selected')
-      let dom_td = event.target.closest('td')
       this.listMenu.rightClickItemIndex = index
-      this.listMenu.menuLocation.x = dom_td.offsetLeft + event.offsetX
-      this.listMenu.menuLocation.y = dom_td.offsetTop + event.offsetY - this.$refs.dom_scrollContent.scrollTop
+      let dom_container = event.target.closest('.' + this.$style.search)
+      const getOffsetValue = (target, x = 0, y = 0) => {
+        if (target === dom_container) return { x, y }
+        if (!target) return { x: 0, y: 0 }
+        x += target.offsetLeft
+        y += target.offsetTop
+        return getOffsetValue(target.offsetParent, x, y)
+      }
+      let { x, y } = getOffsetValue(event.target)
+      this.listMenu.menuLocation.x = x + event.offsetX
+      this.listMenu.menuLocation.y = y + event.offsetY - this.$refs.dom_scrollContent.scrollTop
       this.$nextTick(() => {
         this.listMenu.isShowItemMenu = true
       })
@@ -512,6 +518,15 @@ export default {
           break
       }
     },
+    handleSourceChange(source) {
+      this.$router.replace({
+        path: 'search',
+        query: {
+          text: this.text,
+          source,
+        },
+      })
+    },
   },
 }
 </script>
@@ -520,6 +535,7 @@ export default {
 @import '../assets/styles/layout.less';
 
 .search {
+  position: relative;
   overflow: hidden;
   height: 100%;
   display: flex;
@@ -681,7 +697,7 @@ export default {
 }
 
 each(@themes, {
-  :global(#container.@{value}) {
+  :global(#root.@{value}) {
     .labelSource {
       color: ~'@{color-@{value}-theme}';
     }

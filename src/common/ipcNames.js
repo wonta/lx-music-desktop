@@ -4,10 +4,19 @@ const names = {
     close: 'close',
     min: 'min',
     max: 'max',
+    fullscreen: 'fullscreen',
     set_app_name: 'set_app_name',
     clear_cache: 'clear_cache',
     get_cache_size: 'get_cache_size',
     get_env_params: 'get_env_params',
+    clear_env_params_deeplink: 'clear_env_params_deeplink',
+    wait: 'wait',
+    wait_cancel: 'wait_cancel',
+    interval: 'interval',
+    interval_callback: 'interval_callback',
+    interval_cancel: 'interval_cancel',
+    open_dev_tools: 'open_dev_tools',
+    system_theme_change: 'system_theme_change',
 
     set_music_meta: 'set_music_meta',
     progress: 'progress',
@@ -22,6 +31,7 @@ const names = {
     set_app_setting: 'set_app_setting',
     set_window_size: 'set_window_size',
     show_save_dialog: 'show_save_dialog',
+    get_system_fonts: 'get_system_fonts',
 
     handle_request: 'handle_request',
     cancel_request: 'cancel_request',
@@ -31,6 +41,8 @@ const names = {
     select_dir: 'select_dir',
 
     restart_window: 'restart_window',
+
+    lang_s2t: 'lang_s2t',
 
     handle_kw_decode_lyric: 'handle_kw_decode_lyric',
     get_lyric_info: 'get_lyric_info',
@@ -59,6 +71,8 @@ const names = {
     request_user_api_cancel: 'request_user_api_cancel',
     get_user_api_status: 'get_user_api_status',
     user_api_status: 'user_api_status',
+    user_api_show_update_alert: 'user_api_show_update_alert',
+    user_api_set_allow_update_alert: 'user_api_set_allow_update_alert',
 
     get_lyric: 'get_lyric',
     save_lyric: 'save_lyric',
@@ -66,6 +80,17 @@ const names = {
     get_music_url: 'get_music_url',
     save_music_url: 'save_music_url',
     clear_music_url: 'clear_music_url',
+
+    sync_enable: 'sync_enable',
+    sync_status: 'sync_status',
+    sync_get_status: 'sync_get_status',
+    sync_generate_code: 'sync_generate_code',
+    sync_action_list: 'sync_action_list',
+    sync_list: 'sync_list',
+
+    taskbar_set_thumbar_buttons: 'taskbar_set_thumbar_buttons',
+    taskbar_set_thumbnail_clip: 'taskbar_set_thumbnail_clip',
+    taskbar_on_thumbar_button_click: 'taskbar_on_thumbar_button_click',
   },
   winLyric: {
     close: 'close',

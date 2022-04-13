@@ -1,5 +1,5 @@
 <template lang="pug">
-svg(version='1.1' xmlns='http://www.w3.org/2000/svg' xlink='http://www.w3.org/1999/xlink' style="display: none;")
+svg(version='1.1' xmlns='http://www.w3.org/2000/svg' xlink='http://www.w3.org/1999/xlink' style="display: none;" aria-hidden="true")
   defs
     g#icon-search(fill='currentColor')
       // 30.239 30.239
@@ -162,9 +162,17 @@ svg(version='1.1' xmlns='http://www.w3.org/2000/svg' xlink='http://www.w3.org/19
       //- 0 0 24 24
       path(d="M20,14H4V10H20")
 
+    g#icon-window-minimize-2(fill='currentColor')
+      //- 0 0 24 24
+      path(d="M19,13H5V11H19V13Z")
+
     g#icon-window-close(fill='currentColor')
       //- 0 0 24 24
       path(d="M20 6.91L17.09 4L12 9.09L6.91 4L4 6.91L9.09 12L4 17.09L6.91 20L12 14.91L17.09 20L20 17.09L14.91 12L20 6.91Z")
+
+    g#icon-window-close-2(fill='currentColor')
+      //- 0 0 24 24
+      path(d="M13.46,12L19,17.54V19H17.54L12,13.46L6.46,19H5V17.54L10.54,12L5,6.46V5H6.46L12,10.54L17.54,5H19V6.46L13.46,12Z")
 
 
     g#icon-list-loop(fill='currentColor')
@@ -202,7 +210,7 @@ svg(version='1.1' xmlns='http://www.w3.org/2000/svg' xlink='http://www.w3.org/19
       path(d='M69.148,97.826l17.7-17.651,333,334-17.7,17.652Z')
 
     g#icon-add-2(fill='currentColor')
-      //- 0 0 1024 1024
+      //- 0 0 512 512
       path(d='M256,170s-62.469-76.808-141-24C44.762,222.824,84.909,325.08,256,415c21.339-8.361,44-17,44-17,19-6.392,28.155,20.742,16,26-27.589,11.935,5.974-4.141-60,28C-35.524,313.85,43.993,149.031,95,117c86.8-65.89,162,10,162,10s58.158-60.523,140-23c104.032,58.528,64,161.9,45,196-9.152,15.154-39.559-4.159-32-16,20.34-37.888,45.522-107.349-25-150C314.919,103.92,256,170,256,170Z')
       path(d='M383,368c-8.1.01-24.77-.155-40,0-15.713.16-15.282,34.964,0,35,15.1,0.035,40,0,40,0s-0.068,42.8,0,48c0.208,15.961,32.261,15.791,32-1-0.072-4.649,0-47,0-47s38.008-.031,43,0c15.732,0.046,14.947-33.98-1-34-4.884.093-42,0-42,0s-0.053-28.341,0-46c0.046-15.189-32.028-15.512-32,0C383.027,337.74,382.782,365.139,383,368Z')
 
@@ -217,5 +225,14 @@ svg(version='1.1' xmlns='http://www.w3.org/2000/svg' xlink='http://www.w3.org/19
     g#icon-comment(fill='currentColor')
       // 0 0 24 24
       path(d='M16 11H8V9H16V11M22 4V16C22 17.11 21.11 18 20 18H13.9L10.2 21.71C10 21.9 9.75 22 9.5 22H9C8.45 22 8 21.55 8 21V18H4C2.9 18 2 17.11 2 16V4C2 2.89 2.9 2 4 2H20C21.11 2 22 2.9 22 4M20 4H4V16H10V19.08L13.08 16H20V4')
+
+    g#icon-text(fill='currentColor')
+      // 0 0 24 24
+      path(fill='currentColor', d='M21,6V8H3V6H21M3,18H12V16H3V18M3,13H21V11H3V13Z')
+
+    g#icon-audio-wave(fill='currentColor')
+      // 0 0 24 24
+      path(fill='currentColor', d='M22 12L20 13L19 14L18 13L17 16L16 13L15 21L14 13L13 15L12 13L11 17L10 13L9 22L8 13L7 19L6 13L5 14L4 13L2 12L4 11L5 10L6 11L7 5L8 11L9 2L10 11L11 7L12 11L13 9L14 11L15 3L16 11L17 8L18 11L19 10L20 11L22 12Z')
+
 </template>
 

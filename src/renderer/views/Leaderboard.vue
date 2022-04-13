@@ -1,30 +1,43 @@
-<template lang="pug">
-  div(:class="$style.leaderboard")
-    //- div(:class="$style.header")
-      material-tab(:class="$style.tab" :list="boards" align="left" item-key="id" item-name="name" v-model="tabId")
-      material-select(:class="$style.select" :list="sources.sources" item-key="id" item-name="name" v-model="source")
-    div(:class="$style.lists" ref="dom_lists")
-      div(:class="$style.listsSelect")
-        //- h2(:class="$style.listsTitle") {{$t('core.aside.my_list')}}
-        material-selection(:class="$style.select" :list="sources" item-key="id" item-name="name" v-model="source")
-        //- button(:class="$style.listsAdd" @click="handleShowNewList" :tips="$t('view.list.lists_new_list_btn')")
-          svg(version='1.1' xmlns='http://www.w3.org/2000/svg' xlink='http://www.w3.org/1999/xlink' height='70%' viewBox='0 0 24 24' space='preserve')
-            use(xlink:href='#icon-list-add')
-      ul.scroll(:class="$style.listsContent" ref="dom_lists_list")
-        li(:class="[$style.listsItem, item.id == tabId ? $style.active : null]" :tips="item.name" v-for="item in boardList" :key="item.id" @click="handleToggleList(item.id)")
-          span(:class="$style.listsLabel") {{item.name}}
-    div(:class="$style.list")
-      material-song-list(v-model="selectedData" :rowWidth="{r1: '5%', r2: 'auto', r3: '22%', r4: '22%', r5: '9%', r6: '15%'}" @action="handleSongListAction" :source="source" :page="page" :limit="info.limit" :total="info.total" :noItem="$t('material.song_list.loding_list')" :list="list")
-    material-download-modal(:show="isShowDownload" :musicInfo="musicInfo" @select="handleAddDownload" @close="isShowDownload = false")
-    material-download-multiple-modal(:show="isShowDownloadMultiple" :list="selectedData" @select="handleAddDownloadMultiple" @close="isShowDownloadMultiple = false")
-    material-list-add-modal(:show="isShowListAdd" :musicInfo="musicInfo" @close="isShowListAdd = false")
-    material-list-add-multiple-modal(:show="isShowListAddMultiple" :musicList="selectedData" @close="handleListAddModalClose")
+<template>
+<div :class="$style.leaderboard">
+  <div :class="$style.lists" ref="dom_lists">
+    <div :class="$style.listsSelect">
+      <base-selection :class="$style.select" :list="sources" item-key="id" item-name="name" v-model="source" />
+    </div>
+    <ul class="scroll" :class="$style.listsContent" ref="dom_lists_list">
+      <li :class="[$style.listsItem, { [$style.active]: item.id == tabId }, { [$style.clicked]: boardListData.rightClickItemIndex == index }]"
+      :aria-label="item.name" v-for="(item, index) in boardList" :key="item.id"
+      @click="handleToggleList(item.id)" @contextmenu="handleListsItemRigthClick($event, index)">
+        <span :class="$style.listsLabel">{{item.name}}</span>
+      </li>
+    </ul>
+  </div>
+  <div :class="$style.list">
+    <material-online-list
+      ref="songList"
+      @show-menu="hideListsMenu"
+      @play-list="handlePlayList"
+      @toggle-page="handleGetList"
+      :rowWidth="{r1: '5%', r2: 'auto', r3: '22%', r4: '22%', r5: '9%', r6: '15%'}"
+      :page="page"
+      :limit="listInfo.limit"
+      :total="listInfo.total"
+      :noItem="noItemLabel"
+      :list="list" />
+  </div>
+  <base-menu
+    :menus="listsItemMenu"
+    :location="boardListData.menuLocation"
+    item-name="name"
+    :isShow="boardListData.isShowItemMenu"
+    @menu-click="handleListsItemMenuClick" />
+</div>
 </template>
 
 <script>
 import { mapGetters, mapMutations, mapActions } from 'vuex'
-import { openUrl } from '../utils'
-import musicSdk from '../utils/music'
+import { nextTick } from '@renderer/utils/vueTools'
+import { tempList } from '@renderer/core/share/list'
 export default {
   name: 'Leaderboard',
   data() {
@@ -34,34 +47,81 @@ export default {
       page: 1,
       isShowDownload: false,
       musicInfo: null,
-      selectedData: [],
       isShowDownloadMultiple: false,
       isShowListAdd: false,
       isShowListAddMultiple: false,
+      boardListData: {
+        isShowItemMenu: false,
+        itemMenuControl: {
+          rename: true,
+          sync: false,
+          moveup: true,
+          movedown: true,
+          remove: true,
+        },
+        rightClickItemIndex: -1,
+        menuLocation: {
+          x: 0,
+          y: 0,
+        },
+      },
+      listInfo: {
+        list: [],
+        total: 0,
+        page: 1,
+        limit: 30,
+        key: null,
+      },
+      loadId: null,
+      loadError: null,
     }
   },
   computed: {
     ...mapGetters(['setting']),
-    ...mapGetters('leaderboard', ['sources', 'boards', 'list', 'info']),
-    ...mapGetters('list', ['defaultList']),
+    ...mapGetters('leaderboard', ['sources', 'boards', 'info']),
     boardList() {
       return this.source && this.boards[this.source] ? this.boards[this.source] : []
+    },
+    listsItemMenu() {
+      return [
+        {
+          name: this.$t('list__play'),
+          action: 'play',
+          disabled: false,
+        },
+        {
+          name: this.$t('list__collect'),
+          action: 'collect',
+          disabled: false,
+        },
+      ]
+    },
+    list() {
+      return this.listInfo.list
+    },
+    noItemLabel() {
+      return this.loadId
+        ? this.$t('list__loading')
+        : this.loadError
+          ? this.$t('list__load_failed')
+          : this.listInfo.list.length
+            ? this.$t('list__loading')
+            : this.$t('no_item')
     },
   },
   watch: {
     tabId(n, o) {
       this.setLeaderboard({ tabId: n })
       if (!n || (!o && this.page !== 1)) return
-      this.getList(1).then(() => {
-        this.page = this.info.page
-      })
+      this.listInfo.list = []
+      this.handleGetList(1)
     },
     source(n, o) {
       this.setLeaderboard({ source: n })
       if (o) this.tabId = null
       this.getBoardsList().then(() => {
         if (this.tabId != null) return
-        this.$nextTick(() => {
+        nextTick(() => {
           this.tabId = this.boardList[0] && this.boardList[0].id
         })
       })
@@ -70,163 +130,130 @@ export default {
   mounted() {
     this.source = this.setting.leaderboard.source
     this.tabId = this.setting.leaderboard.tabId
-    this.page = this.info.page
+    this.page = this.listInfo.page
   },
   methods: {
     ...mapMutations(['setLeaderboard']),
-    ...mapActions('leaderboard', ['getBoardsList', 'getList']),
-    ...mapActions('download', ['createDownload', 'createDownloadMultiple']),
-    ...mapMutations('list', ['listAdd', 'listAddMultiple']),
-    ...mapMutations('player', ['setList', 'setTempPlayList']),
-    handleListBtnClick(info) {
-      switch (info.action) {
-        case 'download':
-          this.musicInfo = this.list[info.index]
-          this.$nextTick(() => {
-            this.isShowDownload = true
-          })
-          break
-        case 'play':
-          this.testPlay(info.index)
-          break
-        case 'search':
-          this.handleSearch(info.index)
-          break
-        case 'listAdd':
-          this.musicInfo = this.list[info.index]
-          this.$nextTick(() => {
-            this.isShowListAdd = true
-          })
-          break
-      }
-    },
-    handleMenuClick(info) {
-      let minfo
-      let url
-      switch (info.action) {
-        case 'download':
-          if (this.selectedData.length) {
-            this.isShowDownloadMultiple = true
-          } else {
-            this.musicInfo = this.list[info.index]
-            this.$nextTick(() => {
-              this.isShowDownload = true
-            })
-          }
-          break
-        case 'play':
-          if (this.selectedData.length) {
-            this.listAddMultiple({ id: 'default', list: this.selectedData })
-            this.resetSelect()
-          }
-          this.testPlay(info.index)
-          break
-        case 'playLater':
-          if (this.selectedData.length) {
-            this.setTempPlayList(this.selectedData.map(s => ({ listId: '__temp__', musicInfo: s })))
-            this.resetSelect()
-          } else {
-            this.setTempPlayList([{ listId: '__temp__', musicInfo: this.list[info.index] }])
-          }
-          break
-        case 'search':
-          this.handleSearch(info.index)
-          break
-        case 'addTo':
-          if (this.selectedData.length) {
-            this.$nextTick(() => {
-              this.isShowListAddMultiple = true
-            })
-          } else {
-            this.musicInfo = this.list[info.index]
-            this.$nextTick(() => {
-              this.isShowListAdd = true
-            })
-          }
-          break
-        case 'sourceDetail':
-          minfo = this.list[info.index]
-          url = musicSdk[minfo.source].getMusicDetailPageUrl(minfo)
-          if (!url) return
-          openUrl(url)
-      }
-    },
-    testPlay(index) {
-      let targetSong = this.list[index]
-      this.listAdd({ id: 'default', musicInfo: targetSong })
-      let targetIndex = this.defaultList.list.findIndex(
-        s => s.songmid === targetSong.songmid,
-      )
-      if (targetIndex > -1) {
-        this.setList({
-          list: this.defaultList,
-          index: targetIndex,
+    ...mapActions('leaderboard', ['getBoardsList', 'getList', 'getListAll']),
+    ...mapMutations('list', ['createUserList']),
+    ...mapMutations('player', ['setTempList', 'updateTempList']),
+    handleGetList(page) {
+      const loadId = `${this.source}${this.tabId}${page}`
+      this.loadError = false
+      this.loadId = loadId
+      this.getList(page).then(listInfo => {
+        if (this.loadId != loadId) return
+        this.listInfo.list = listInfo.list
+        this.listInfo.total = listInfo.total
+        this.listInfo.limit = listInfo.limit
+        this.listInfo.page = listInfo.page
+        this.listInfo.key = listInfo.key
+        this.page = listInfo.page
+        nextTick(() => {
+          this.$refs.songList?.scrollToTop()
         })
-      }
-    },
-    handleSearch(index) {
-      const info = this.list[index]
-      this.$router.push({
-        path: 'search',
-        query: {
-          text: `${info.name} ${info.singer}`,
-        },
+      }).catch(() => {
+        if (this.loadId != loadId) return
+        this.loadError = true
+      }).finally(() => {
+        if (this.loadId != loadId) return
+        this.loadId = null
       })
-    },
-    handleTogglePage(page) {
-      this.getList(page).then(() => {
-        this.page = this.info.page
-      })
-    },
-    handleAddDownload(type) {
-      this.createDownload({ musicInfo: this.musicInfo, type })
-      this.isShowDownload = false
-    },
-    handleAddDownloadMultiple(type) {
-      if (this.source == 'xm' && type == 'flac') type = 'wav'
-      this.createDownloadMultiple({ list: [...this.selectedData], type })
-      this.isShowDownloadMultiple = false
-      this.resetSelect()
-    },
-    handleListAddModalClose(isSelect) {
-      if (isSelect) this.resetSelect()
-      this.isShowListAddMultiple = false
-    },
-    // handleFlowBtnClick(action) {
-    //   switch (action) {
-    //     case 'download':
-    //       this.isShowDownloadMultiple = true
-    //       break
-    //     case 'play':
-    //       this.testPlay()
-    //       break
-    //     case 'add':
-    //       this.isShowListAddMultiple = true
-    //       break
-    //   }
-    // },
-    handleSongListAction({ action, data }) {
-      switch (action) {
-        case 'listBtnClick':
-          return this.handleListBtnClick(data)
-        case 'menuClick':
-          return this.handleMenuClick(data)
-        case 'togglePage':
-          return this.handleTogglePage(data)
-        // case 'flowBtnClick':
-        //   return this.handleFlowBtnClick(data)
-        case 'testPlay':
-          return this.testPlay(data)
-        case 'search':
-          return this.handleSearch(data)
-      }
     },
     handleToggleList(id) {
       if (this.tabId == id) return
       this.tabId = id
     },
-    resetSelect() {
-      this.selectedData = []
+    handleListsItemRigthClick(event, index) {
+      // const board = this.boardList[index]
+      // this.boardListData.itemMenuControl.sync = !!source && !!musicSdk[source].songList
+      // this.boardListData.itemMenuControl.moveup = index > 0
+      // this.boardListData.itemMenuControl.movedown = index < this.userList.length - 1
+      this.boardListData.rightClickItemIndex = index
+      this.boardListData.menuLocation.x = event.currentTarget.offsetLeft + event.offsetX
+      this.boardListData.menuLocation.y = event.currentTarget.offsetTop + event.offsetY - this.$refs.dom_lists_list.scrollTop
+      // this.hideListsMenu()
+      this.$refs.songList.hideMenu()
+      this.$nextTick(() => {
+        this.boardListData.isShowItemMenu = true
+      })
+    },
+    hideListsMenu() {
+      this.boardListData.isShowItemMenu = false
+      this.boardListData.rightClickItemIndex = -1
+    },
+    async handleListsItemMenuClick(action) {
+      let index = this.boardListData.rightClickItemIndex
+      this.hideListsMenu()
+      this.boardListData.isShowItemMenu = false
+
+      if (action) {
+        const board = this.boardList[index]
+        const id = `board__${this.source}__${board.id}`
+        switch (action && action.action) {
+          case 'play':
+            this.playSongListDetail({
+              boardId: board.id,
+              id,
+            })
+            break
+          case 'collect':
+            this.addSongListDetail({
+              boardId: board.id,
+              boardName: board.name,
+              source: this.source,
+              id,
+            })
+            break
+        }
+      }
+    },
+    async addSongListDetail({ boardId, boardName, source, id }) {
+      // console.log(this.listDetail.info)
+      // if (!this.listDetail.info.name) return
+      const list = await this.getListAll({ id: boardId })
+      this.createUserList({
+        name: boardName,
+        id,
+        list,
+        source,
+        sourceListId: `board__${boardId}`,
+      })
+    },
+    async playSongListDetail({ boardId, id, index = 0 }) {
+      let isPlayingList = false
+      const list = this.tabId == boardId ? [...this.list] : null
+      if (list?.length) {
+        this.setTempList({
+          list,
+          index,
+          id,
+        })
+        isPlayingList = true
+      }
+      const fullList = await this.getListAll({ id: boardId })
+      if (!fullList.length) return
+      if (isPlayingList) {
+        if (tempList.meta.id == id) {
+          this.updateTempList({
+            list: fullList,
+            id,
+          })
+        }
+      } else {
+        this.setTempList({
+          list: fullList,
+          index,
+          id,
+        })
+      }
+    },
+    handlePlayList(index) {
+      this.playSongListDetail({
+        boardId: this.tabId,
+        id: `board__${this.source}__${this.tabId}`,
+        index,
+      })
     },
   },
 }
@@ -300,7 +327,7 @@ export default {
     transition: opacity .3s ease;
   }
 
-  :global(.list) {
+  :global(.selection-list) {
     max-height: 500px;
     box-shadow: 0 1px 8px 0 rgba(0,0,0,.2);
     li {
@@ -323,8 +350,7 @@ export default {
 .listsContent {
   flex: auto;
   min-width: 0;
-  overflow-y: scroll;
-  overflow-x: hidden;
+  overflow-y: scroll !important;
   // border-right: 1px solid rgba(0, 0, 0, 0.12);
 }
 .listsItem {
@@ -379,12 +405,12 @@ export default {
 
 
 each(@themes, {
-  :global(#container.@{value}) {
+  :global(#root.@{value}) {
     .listsSelect {
       :global(.label) {
         color: ~'@{color-@{value}-theme_2-font}' !important;
       }
-      :global(.list) {
+      :global(.selection-list) {
         li {
           background-color: ~'@{color-@{value}-theme_2-background_2}';
           &:hover {

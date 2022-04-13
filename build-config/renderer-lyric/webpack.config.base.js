@@ -1,8 +1,8 @@
 const path = require('path')
-const VueLoaderPlugin = require('vue-loader/lib/plugin')
+const { VueLoaderPlugin } = require('vue-loader')
 const HTMLPlugin = require('html-webpack-plugin')
 const MiniCssExtractPlugin = require('mini-css-extract-plugin')
-const CleanCSSPlugin = require('less-plugin-clean-css')
+const ESLintPlugin = require('eslint-webpack-plugin')
 
 const vueLoaderConfig = require('../vue-loader.config')
 const { mergeCSSLoader } = require('../utils')
@@ -18,10 +18,11 @@ module.exports = {
     filename: '[name].js',
     libraryTarget: 'commonjs2',
     path: path.join(__dirname, '../../dist/electron'),
-    publicPath: './',
+    publicPath: 'auto',
   },
   resolve: {
     alias: {
+      '@': path.join(__dirname, '../../src'),
       '@main': path.join(__dirname, '../../src/main'),
       '@renderer': path.join(__dirname, '../../src/renderer'),
       '@lyric': path.join(__dirname, '../../src/renderer-lyric'),
@@ -33,16 +34,8 @@ module.exports = {
   module: {
     rules: [
       {
-        test: /\.(vue|js)$/,
-        use: {
-          loader: 'eslint-loader',
-          options: {
-            formatter: require('eslint-formatter-friendly'),
-            emitWarning: isDev,
-          },
-        },
-        exclude: /node_modules/,
-        enforce: 'pre',
+        test: /\.node$/,
+        use: 'node-loader',
       },
       {
         test: /\.vue$/,
@@ -64,20 +57,6 @@ module.exports = {
           loader: 'less-loader',
           options: {
             sourceMap: true,
-            lessOptions: {
-              plugins: [
-                new CleanCSSPlugin({ advanced: true }),
-              ],
-            },
-          },
-        }),
-      },
-      {
-        test: /\.styl(:?us)?$/,
-        oneOf: mergeCSSLoader({
-          loader: 'stylus-loader',
-          options: {
-            sourceMap: true,
           },
         }),
       },
@@ -97,26 +76,53 @@ module.exports = {
       },
       {
         test: /\.(png|jpe?g|gif|svg)(\?.*)?$/,
-        loader: 'url-loader',
-        options: {
-          limit: 10000,
-          name: 'imgs/[name]--[folder].[ext]',
+        exclude: path.join(__dirname, '../../src/renderer/assets/svgs'),
+        type: 'asset',
+        parser: {
+          dataUrlCondition: {
+            maxSize: 10000,
+          },
+        },
+        generator: {
+          filename: 'imgs/[name]-[contenthash:8][ext]',
         },
       },
       {
+        test: /\.svg$/,
+        include: path.join(__dirname, '../../src/renderer/assets/svgs'),
+        use: [
+          {
+            loader: 'svg-sprite-loader',
+            options: {
+              symbolId: 'icon-[name]',
+            },
+          },
+          'svg-transform-loader',
+          'svgo-loader',
+        ],
+      },
+      {
         test: /\.(mp4|webm|ogg|mp3|wav|flac|aac)(\?.*)?$/,
-        loader: 'url-loader',
-        options: {
-          limit: 10000,
-          name: 'media/[name]--[folder].[ext]',
+        type: 'asset',
+        parser: {
+          dataUrlCondition: {
+            maxSize: 10000,
+          },
+        },
+        generator: {
+          filename: 'media/[name]-[contenthash:8][ext]',
         },
       },
       {
         test: /\.(woff2?|eot|ttf|otf)(\?.*)?$/,
-        loader: 'url-loader',
-        options: {
-          limit: 10000,
-          name: 'fonts/[name]--[folder].[ext]',
+        type: 'asset',
+        parser: {
+          dataUrlCondition: {
+            maxSize: 10000,
+          },
+        },
+        generator: {
+          filename: 'fonts/[name]-[contenthash:8][ext]',
         },
       },
     ],
@@ -130,7 +136,6 @@ module.exports = {
       template: path.join(__dirname, '../../src/renderer-lyric/index.pug'),
       isProd: process.env.NODE_ENV == 'production',
       browser: process.browser,
-      scriptLoading: 'blocking',
       __dirname,
     }),
     new VueLoaderPlugin(),
@@ -139,6 +144,10 @@ module.exports = {
       // both options are optional
       filename: isDev ? '[name].css' : '[name].[contenthash:8].css',
       chunkFilename: isDev ? '[id].css' : '[id].[contenthash:8].css',
+    }),
+    new ESLintPlugin({
+      extensions: ['js', 'vue'],
+      formatter: require('eslint-formatter-friendly'),
     }),
   ],
 }
