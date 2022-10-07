@@ -1,4 +1,4 @@
-import { openUrl } from '@renderer/utils'
+import { openUrl, getFontSizeWithScreen } from '@renderer/utils'
 import { base as eventBaseName } from '@renderer/event/names'
 import { onSetConfig, onSystemThemeChange } from '@renderer/utils/tools'
 import { isFullscreen, themeShouldUseDarkColors } from '@renderer/core/share'
@@ -12,11 +12,21 @@ import {
   useRefGetter,
 } from '@renderer/utils/vueTools'
 
-const handle_key_esc_down = ({ event }) => {
-  if (event.repeat) return
-  if (event.target.tagName != 'INPUT' || event.target.classList.contains('ignore-esc')) return
+const handle_key_down = ({ event, type, key }) => {
+  // console.log(key)
+  if (key != 'escape' || !event || event.repeat || type == 'up' || window.isEditingHotKey || event.target.classList.contains('ignore-esc')) return
+  if (event.target.tagName != 'INPUT') {
+    if (isFullscreen.value) {
+      event.lx_handled = true
+      rendererInvoke(NAMES.mainWindow.fullscreen, false).then(fullscreen => {
+        isFullscreen.value = fullscreen
+      })
+    }
+    return
+  }
   event.target.value = ''
   event.target.blur()
+  event.lx_handled = true
 }
 const handleBodyClick = event => {
   if (event.target.tagName != 'A') return
@@ -28,8 +38,11 @@ const handle_open_devtools = event => {
   rendererSend(NAMES.mainWindow.open_dev_tools)
 }
 const handle_fullscreen = event => {
-  if (event.event.repeat) return
-  rendererInvoke(NAMES.mainWindow.fullscreen, !isFullscreen.value).then(fullscreen => {
+  let fullscreen = !isFullscreen.value
+  if (typeof event == 'boolean') {
+    fullscreen = event
+  } else if (event.event.repeat) return
+  rendererInvoke(NAMES.mainWindow.fullscreen, fullscreen).then(fullscreen => {
     isFullscreen.value = fullscreen
   })
 }
@@ -41,9 +54,36 @@ export default ({
   isProd,
   isLinux,
 }) => {
-  const setSetting = useCommit('setSetting')
+  const theme = useRefGetter('theme')
+  const font = useRefGetter('font')
   const windowSizeActive = useRefGetter('windowSizeActive')
+  const setSetting = useCommit('setSetting')
   const isShowAnimation = useRefGetter('isShowAnimation')
+
+  const dom_root = document.getElementById('root')
+
+
+  watch(theme, (val) => {
+    dom_root.className = val
+  })
+  watch(font, (val) => {
+    document.documentElement.style.fontFamily = val
+  }, {
+    immediate: true,
+  })
+  watch(isFullscreen, val => {
+    if (val) {
+      document.body.classList.remove(window.dt ? 'disableTransparent' : 'transparent')
+      document.body.classList.add('fullscreen')
+      document.documentElement.style.fontSize = getFontSizeWithScreen(window.screen.width) + 'px'
+    } else {
+      document.body.classList.remove('fullscreen')
+      document.body.classList.add(window.dt ? 'disableTransparent' : 'transparent')
+      document.documentElement.style.fontSize = windowSizeActive.value.fontSize
+    }
+  }, {
+    immediate: true,
+  })
 
   watch(windowSizeActive, ({ fontSize }) => {
     document.documentElement.style.fontSize = fontSize
@@ -58,6 +98,8 @@ export default ({
         document.body.classList.add('disableAnimation')
       }
     }
+  }, {
+    immediate: true,
   })
 
   const rSetConfig = onSetConfig((event, config) => {
@@ -72,9 +114,10 @@ export default ({
   })
 
   window.eventHub.emit(eventBaseName.bindKey)
-  window.eventHub.on('key_escape_down', handle_key_esc_down)
+  window.eventHub.on(eventBaseName.key_down, handle_key_down)
   window.eventHub.on('key_mod+f12_down', handle_open_devtools)
   window.eventHub.on('key_f11_down', handle_fullscreen)
+  window.eventHub.on(eventBaseName.fullscreenToggle, handle_fullscreen)
   document.body.addEventListener('click', handleBodyClick, true)
 
   if (isProd && !window.dt && !isLinux) {
@@ -86,9 +129,10 @@ export default ({
   }
 
   onBeforeUnmount(() => {
-    window.eventHub.off('key_escape_down', handle_key_esc_down)
+    window.eventHub.off(eventBaseName.key_down, handle_key_down)
     window.eventHub.off('key_mod+f12_down', handle_open_devtools)
     window.eventHub.off('key_f11_down', handle_fullscreen)
+    window.eventHub.off(eventBaseName.fullscreenToggle, handle_fullscreen)
     document.body.removeEventListener('click', handleBodyClick)
     window.eventHub.emit(eventBaseName.unbindKey)
     rSetConfig()

@@ -62,22 +62,31 @@ export default {
       bangid: 128,
     },
   ],
-  getUrl(id, period, limit) {
-    return `https://u.y.qq.com/cgi-bin/musicu.fcg?format=json&inCharset=utf8&outCharset=utf-8&platform=yqq.json&needNewCode=0&data=${encodeURIComponent(JSON.stringify({
-      comm: {
-        cv: 1602,
-        ct: 20,
+  listDetailRequest(id, period, limit) {
+    // console.log(id, period, limit)
+    return httpFetch('https://u.y.qq.com/cgi-bin/musicu.fcg', {
+      method: 'post',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)',
       },
-      toplist: {
-        module: 'musicToplist.ToplistInfoServer',
-        method: 'GetDetail',
-        param: {
-          topid: id,
-          num: limit,
-          period,
+      body: {
+        toplist: {
+          module: 'musicToplist.ToplistInfoServer',
+          method: 'GetDetail',
+          param: {
+            topid: id,
+            num: limit,
+            period,
+          },
+        },
+        comm: {
+          uin: 0,
+          format: 'json',
+          ct: 20,
+          cv: 1859,
         },
       },
-    }))}`
+    }).promise
   },
   regExps: {
     periodList: /<i class="play_cover__btn c_tx_link js_icon_play" data-listkey=".+?" data-listname=".+?" data-tid=".+?" data-date=".+?" .+?<\/i>/g,
@@ -86,16 +95,14 @@ export default {
   periods: {},
   periodUrl: 'https://c.y.qq.com/node/pc/wk_v15/top.html',
   _requestBoardsObj: null,
-  _requestDataObj: null,
   getBoardsData() {
     if (this._requestBoardsObj) this._requestBoardsObj.cancelHttp()
     this._requestBoardsObj = httpFetch('https://c.y.qq.com/v8/fcg-bin/fcg_myqq_toplist.fcg?g_tk=1928093487&inCharset=utf-8&outCharset=utf-8&notice=0&format=json&uin=0&needNewCode=1&platform=h5')
     return this._requestBoardsObj.promise
   },
   getData(url) {
-    if (this._requestDataObj) this._requestDataObj.cancelHttp()
-    this._requestDataObj = httpFetch(url)
-    return this._requestDataObj.promise
+    const requestDataObj = httpFetch(url)
+    return requestDataObj.promise
   },
   getSinger(singers) {
     let arr = []
@@ -123,17 +130,17 @@ export default {
           size,
         }
       }
-      if (item.file.size_ape !== 0) {
-        let size = sizeFormate(item.file.size_ape)
-        types.push({ type: 'ape', size })
-        _types.ape = {
-          size,
-        }
-      }
       if (item.file.size_flac !== 0) {
         let size = sizeFormate(item.file.size_flac)
         types.push({ type: 'flac', size })
         _types.flac = {
+          size,
+        }
+      }
+      if (item.file.size_hires !== 0) {
+        let size = sizeFormate(item.file.size_hires)
+        types.push({ type: 'flac32bit', size })
+        _types.flac32bit = {
           size,
         }
       }
@@ -225,7 +232,7 @@ export default {
     let info = this.periods[bangid]
     let p = info ? Promise.resolve(info.period) : this.getPeriods(bangid)
     return p.then(period => {
-      return this.getData(this.getUrl(bangid, period, this.limit)).then(resp => {
+      return this.listDetailRequest(bangid, period, this.limit).then(resp => {
         if (resp.body.code !== 0) return this.getList(bangid, page, retryNum)
         return {
           total: resp.body.toplist.data.songInfoList.length,

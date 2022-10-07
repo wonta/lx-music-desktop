@@ -2,7 +2,7 @@ const path = require('path')
 const os = require('os')
 
 const defaultSetting = {
-  version: '1.0.54',
+  version: '1.0.59',
   player: {
     togglePlayMethod: 'listLoop',
     highQuality: false,
@@ -12,12 +12,14 @@ const defaultSetting = {
     mediaDeviceId: 'default',
     isMediaDeviceRemovedStopPlay: false,
     isShowLyricTranslation: false,
+    isShowLyricRoma: false,
     isS2t: false, // 是否将歌词从简体转换为繁体
     isPlayLxlrc: true,
     isSavePlayTime: false,
     audioVisualization: false,
     waitPlayEndStop: true,
     waitPlayEndStopTime: '',
+    autoSkipOnError: true,
   },
   playDetail: {
     isZoomActiveLrc: true,
@@ -31,13 +33,15 @@ const defaultSetting = {
     enable: false,
     isLock: false,
     isAlwaysOnTop: false,
-    width: 380,
-    height: 420,
+    isAlwaysOnTopLoop: false,
+    width: 450,
+    height: 300,
     x: null,
     y: null,
     theme: 0,
     isLockScreen: true,
     isDelayScroll: true,
+    isHoverHide: false,
     style: {
       font: '',
       fontSize: 120,
@@ -105,6 +109,7 @@ const defaultSetting = {
     port: '23332',
   },
   windowSizeId: 2,
+  startInFullscreen: false,
   theme: {
     id: 0,
     lightId: 0,

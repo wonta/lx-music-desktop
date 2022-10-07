@@ -1,7 +1,7 @@
 import { useCommit, useRefGetter } from '@renderer/utils/vueTools'
 import { getPlayList } from '@renderer/utils'
 import { getPlayInfo, getSearchHistoryList } from '@renderer/utils/tools'
-import { initListPosition, initListPrevSelectId } from '@renderer/utils/data'
+import { initListPosition, initListPrevSelectId, initListUpdateInfo } from '@renderer/utils/data'
 import music from '@renderer/utils/music'
 import { log } from '@common/utils'
 import {
@@ -94,7 +94,7 @@ const useListInit = ({
 const usePlayInfoInit = () => {
   const setPlayList = useCommit('player', 'setList')
 
-  return downloadList => {
+  return () => {
     return getPlayInfo().then(info => {
       window.restorePlayInfo = null
       if (!info?.listId || info.index < 0) return
@@ -152,11 +152,12 @@ export default ({
     await Promise.all([
       initListPosition(), // 列表位置记录
       initListPrevSelectId(), // 上次选中的列表记录
+      initListUpdateInfo(), // 列表更新设置
       initUserApi(), // 自定义API
     ]).catch(err => log.error(err))
     music.init() // 初始化音乐sdk
     await initList().catch(err => log.error(err)) // 初始化列表
-    await initPlayInfo(downloadList.value).catch(err => log.error(err)) // 初始化上次的歌曲播放信息
+    await initPlayInfo(downloadList).catch(err => log.error(err)) // 初始化上次的歌曲播放信息
     await initSearchHistory(saveSearchHistoryListThrottle).catch(err => log.error(err)) // 初始化搜索历史记录
   }
 }

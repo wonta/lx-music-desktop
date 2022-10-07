@@ -10,12 +10,14 @@ export const currentStting = ref({
     mediaDeviceId: 'default',
     isMediaDeviceRemovedStopPlay: false,
     isShowLyricTranslation: false,
+    isShowLyricRoma: false,
     isS2t: false, // 是否将歌词从简体转换为繁体
     isPlayLxlrc: true,
     isSavePlayTime: false,
     audioVisualization: false,
     waitPlayEndStop: true,
     waitPlayEndStopTime: '',
+    autoSkipOnError: true,
   },
   playDetail: {
     isZoomActiveLrc: true,
@@ -34,6 +36,7 @@ export const currentStting = ref({
     theme: '',
     isLockScreen: true,
     isDelayScroll: true,
+    isHoverHide: false,
     style: {
       font: '',
       fontSize: 125,
@@ -85,6 +88,7 @@ export const currentStting = ref({
     port: '23332',
   },
   windowSizeId: 1,
+  startInFullscreen: false,
   langId: 'cns',
   theme: {
     id: 0,

@@ -22,7 +22,8 @@ div(:class="$style.search")
               td.nobreak.center(style="width: 5%; padding-left: 3px; padding-right: 3px;" :class="$style.noSelect" @click.stop) {{index + 1}}
               td.break
                 span.select {{item.name}}
-                span.badge.badge-theme-success(:class="[$style.labelQuality, $style.noSelect]" v-if="item._types.ape || item._types.flac || item._types.wav") {{$t('tag__lossless')}}
+                span.badge.badge-theme-success(:class="[$style.labelQuality, $style.noSelect]" v-if="item._types.flac32bit") {{$t('tag__lossless_24bit')}}
+                span.badge.badge-theme-success(:class="[$style.labelQuality, $style.noSelect]" v-else-if="item._types.ape || item._types.flac || item._types.wav") {{$t('tag__lossless')}}
                 span.badge.badge-theme-info(:class="[$style.labelQuality, $style.noSelect]" v-else-if="item._types['320k']") {{$t('tag__high_quality')}}
                 span(:class="[$style.labelSource, $style.noSelect]" v-if="searchSourceId == 'all'") {{item.source}}
               td.break(style="width: 22%;")
@@ -43,7 +44,7 @@ div(:class="$style.search")
         p {{$t('list__loading')}}
     transition(enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut")
       div(v-show="!isLoading && !listInfo.list.length" :class="$style.noitem")
-        div.scroll(:class="$style.noitemListContainer" v-if="setting.search.isShowHotSearch || (setting.search.isShowHistorySearch && setting.search.isShowHistorySearch.length)")
+        div.scroll(:class="$style.noitemListContainer" v-if="setting.search.isShowHotSearch || (setting.search.isShowHistorySearch && historyList.length)")
           dl(:class="[$style.noitemList, $style.noitemHotSearchList]" v-if="setting.search.isShowHotSearch")
             dt(:class="$style.noitemListTitle") {{$t('search__hot_search')}}
             dd(:class="$style.noitemListItem" @click="handleNoitemSearch(item)" v-for="item in hotSearchList") {{item}}
@@ -66,7 +67,7 @@ div(:class="$style.search")
 
 <script>
 import { mapGetters, mapActions, mapMutations } from 'vuex'
-import { scrollTo, clipboardWriteText, assertApiSupport, openUrl } from '@renderer/utils'
+import { clipboardWriteText, assertApiSupport, openUrl } from '@renderer/utils'
 import musicSdk from '@renderer/utils/music'
 import { defaultList } from '@renderer/core/share/list'
 import { getList } from '@renderer/core/share/utils'
@@ -107,6 +108,7 @@ export default {
         },
       },
       isLoading: false,
+      searchId: null,
     }
   },
   beforeRouteUpdate(to, from) {
@@ -259,14 +261,20 @@ export default {
       this.handleSelectAllData()
     },
     handleSearch(text, page) {
-      if (text === '') return this.clearList()
+      const searchId = this.searchId = `${this.searchSourceId}__${page}__${text}`
+      if (text === '') {
+        this.isLoading = false
+        return this.clearList()
+      }
       this.isLoading = true
       this.search({ text, page, limit: this.listInfo.limit }).then(data => {
+        if (this.searchId != searchId) return
         this.page = page
         this.$nextTick(() => {
-          scrollTo(this.$refs.dom_scrollContent, 0)
+          this.$refs.dom_scrollContent.scrollTo(0, 0)
         })
       }).finally(() => {
+        if (this.searchId != searchId) return
         this.isLoading = false
       })
     },
@@ -569,6 +577,8 @@ export default {
 .tbody {
   flex: auto;
   overflow-y: auto;
+  scroll-behavior: smooth;
+
   td {
     font-size: 12px;
     :global(.badge) {

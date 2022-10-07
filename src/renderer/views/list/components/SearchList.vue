@@ -4,12 +4,16 @@ teleport(to="#view")
     transition(enter-active-class="animated-fast zoomIn" leave-active-class="animated zoomOut" @after-leave="handleAnimated")
       div(:class="$style.search" v-show="visible")
         div(:class="$style.form")
-          input.key-bind.ignore-esc(:placeholder="placeholder" v-model.trim="text" ref="dom_input"
+          input.ignore-esc(:placeholder="placeholder" v-model.trim="text" ref="dom_input"
                 @input="handleDelaySearch"
                 @keyup.enter="handleTemplistClick(selectIndex)"
                 @keyup.arrow-down.prevent="handleKeyDown"
                 @keyup.arrow-up.prevent="handleKeyUp"
                 @keyup.escape.prevent="handleKeyEsc"
+                @keydown.control.prevent="handle_key_mod_down"
+                @keydown.meta.prevent="handle_key_mod_down"
+                @keyup.control.prevent="handle_key_mod_up"
+                @keyup.meta.prevent="handle_key_mod_up"
                 @contextmenu="handleContextMenu")
           button(type="button" @click="handleHide")
             slot
@@ -26,8 +30,7 @@ teleport(to="#view")
 </template>
 
 <script>
-import { clipboardReadText, debounce, scrollTo } from '@renderer/utils'
-let canceleFn
+import { clipboardReadText, debounce } from '@renderer/utils'
 
 
 // https://blog.csdn.net/xcxy2015/article/details/77164126#comments
@@ -148,13 +151,13 @@ export default {
   },
   mounted() {
     this.init()
-    window.eventHub.on('key_mod_down', this.handle_key_mod_down)
-    window.eventHub.on('key_mod_up', this.handle_key_mod_up)
+    // window.eventHub.on('key_mod_down', this.handle_key_mod_down)
+    // window.eventHub.on('key_mod_up', this.handle_key_mod_up)
     window.eventHub.on('key_mod+f_down', this.handle_key_mod_f_down)
   },
   beforeUnmount() {
-    window.eventHub.off('key_mod_down', this.handle_key_mod_down)
-    window.eventHub.off('key_mod_up', this.handle_key_mod_up)
+    // window.eventHub.off('key_mod_down', this.handle_key_mod_down)
+    // window.eventHub.off('key_mod_up', this.handle_key_mod_up)
     window.eventHub.off('key_mod+f_down', this.handle_key_mod_f_down)
   },
   methods: {
@@ -178,12 +181,10 @@ export default {
       }
     },
     handle_key_mod_down() {
-      this.isModDown = true
+      if (!this.isModDown) this.isModDown = true
     },
     handle_key_mod_up() {
-      setTimeout(() => {
-        this.isModDown = false
-      }, 100)
+      if (this.isModDown) this.isModDown = false
     },
     handle_key_mod_f_down() {
       if (this.visible) this.$refs.dom_input.focus()
@@ -223,13 +224,13 @@ export default {
       let dom = this.$refs.dom_list.children[this.selectIndex]
       let offsetTop = dom.offsetTop
       let scrollTop = this.$refs.dom_scrollContainer.scrollTop
+      let top
       if (offsetTop < scrollTop) {
-        if (canceleFn) canceleFn()
-        canceleFn = scrollTo(this.$refs.dom_scrollContainer, offsetTop, 200, () => canceleFn = null)
+        top = offsetTop
       } else if (offsetTop + dom.clientHeight > this.$refs.dom_scrollContainer.clientHeight + scrollTop) {
-        if (canceleFn) canceleFn()
-        canceleFn = scrollTo(this.$refs.dom_scrollContainer, offsetTop + dom.clientHeight - this.$refs.dom_scrollContainer.clientHeight, 200, () => canceleFn = null)
-      }
+        top = offsetTop + dom.clientHeight - this.$refs.dom_scrollContainer.clientHeight
+      } else return
+      this.$refs.dom_scrollContainer.scrollTo(0, top)
     },
     handleContextMenu() {
       let str = clipboardReadText()
@@ -345,6 +346,8 @@ export default {
     height: 0;
     transition-property: height;
     position: relative;
+    scroll-behavior: smooth;
+
     li {
       position: relative;
       cursor: pointer;

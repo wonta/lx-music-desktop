@@ -2,11 +2,40 @@ const { common: COMMON_EVENT_NAME, winLyric: WIN_LYRIC_EVENT_NAME, hotKey: HOT_K
 const { mainSend, NAMES: { winLyric: ipcWinLyricNames } } = require('../../../common/ipc')
 const { desktop_lyric } = require('../../../common/hotKey')
 const { getLyricWindowBounds } = require('./utils')
+const { isLinux } = require('@common/utils')
 
 let isLock = null
 let isEnable = null
 let isAlwaysOnTop = null
+let isAlwaysOnTopLoop = null
 let isLockScreen = null
+let isHoverHide = null
+
+const alwaysOnTopTools = {
+  timeout: null,
+  alwaysOnTop: false,
+  setAlwaysOnTop(flag, isLoop) {
+    this.alwaysOnTop = flag
+    this.clearLoop()
+    global.modules.lyricWindow.setAlwaysOnTop(flag, 'screen-saver')
+    console.log(isLoop)
+    if (flag && isLoop) this.startLoop()
+  },
+  startLoop() {
+    if (!this.alwaysOnTop) return
+    this.timeout = setInterval(() => {
+      if (!global.modules.lyricWindow) return this.clearLoop()
+      global.modules.lyricWindow.setAlwaysOnTop(true, 'screen-saver')
+    }, 1000)
+  },
+  clearLoop() {
+    if (!this.timeout) return
+    clearInterval(this.timeout)
+    this.timeout = null
+  },
+}
+
+
 const setLrcConfig = () => {
   let desktopLyric = global.appSetting.desktopLyric
   if (global.modules.lyricWindow) {
@@ -14,19 +43,34 @@ const setLrcConfig = () => {
       config: desktopLyric,
       languageId: global.appSetting.langId,
       isShowLyricTranslation: global.appSetting.player.isShowLyricTranslation,
+      isShowLyricRoma: global.appSetting.player.isShowLyricRoma,
       isPlayLxlrc: global.appSetting.player.isPlayLxlrc,
     })
     if (isLock != desktopLyric.isLock) {
       isLock = desktopLyric.isLock
       if (desktopLyric.isLock) {
-        global.modules.lyricWindow.setIgnoreMouseEvents(true, { forward: false })
+        global.modules.lyricWindow.setIgnoreMouseEvents(true, { forward: !isLinux && global.appSetting.desktopLyric.isHoverHide })
       } else {
-        global.modules.lyricWindow.setIgnoreMouseEvents(false)
+        global.modules.lyricWindow.setIgnoreMouseEvents(false, { forward: !isLinux && global.appSetting.desktopLyric.isHoverHide })
+      }
+    }
+    if (isHoverHide != desktopLyric.isHoverHide) {
+      isHoverHide = desktopLyric.isHoverHide
+      if (!isLinux) {
+        global.modules.lyricWindow.setIgnoreMouseEvents(desktopLyric.isLock, { forward: global.appSetting.desktopLyric.isHoverHide })
       }
     }
     if (isAlwaysOnTop != desktopLyric.isAlwaysOnTop) {
       isAlwaysOnTop = desktopLyric.isAlwaysOnTop
-      global.modules.lyricWindow.setAlwaysOnTop(desktopLyric.isAlwaysOnTop, 'screen-saver')
+      alwaysOnTopTools.setAlwaysOnTop(desktopLyric.isAlwaysOnTop, desktopLyric.isAlwaysOnTopLoop)
+    }
+    if (isAlwaysOnTopLoop != desktopLyric.isAlwaysOnTopLoop) {
+      isAlwaysOnTopLoop = desktopLyric.isAlwaysOnTopLoop
+      if (isAlwaysOnTopLoop) {
+        alwaysOnTopTools.startLoop()
+      } else {
+        alwaysOnTopTools.clearLoop()
+      }
     }
     if (isLockScreen != desktopLyric.isLockScreen) {
       isLockScreen = desktopLyric.isLockScreen
@@ -45,6 +89,7 @@ const setLrcConfig = () => {
     if (desktopLyric.enable) {
       global.lx_event.winLyric.create()
     } else {
+      alwaysOnTopTools.clearLoop()
       global.lx_event.winLyric.close()
     }
   }

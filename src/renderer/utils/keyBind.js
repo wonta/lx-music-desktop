@@ -2,13 +2,16 @@ import { isMac } from '../../common/utils'
 
 const downKeys = new Set()
 
-const handleEvent = (type, event, keys) => {
+const handleEvent = (type, event, keys, isEditing) => {
+  let eventKey = event.key
   if (isMac) {
     let index = keys.indexOf('meta')
     if (index > -1) keys.splice(index, 1, 'mod')
+    if (eventKey == 'Meta') eventKey = 'mod'
   } else {
     let index = keys.indexOf('ctrl')
     if (index > -1) keys.splice(index, 1, 'mod')
+    if (eventKey == 'Control') eventKey = 'mod'
   }
   let key = keys.join('+')
 
@@ -20,7 +23,7 @@ const handleEvent = (type, event, keys) => {
       downKeys.delete(key)
       break
   }
-  handleSendEvent(key, type, event, keys)
+  handleSendEvent(key, eventKey, type, event, keys, isEditing)
 }
 
 // 修饰键处理
@@ -51,7 +54,7 @@ const assertStopCallback = element => {
 }
 
 const handleKeyDown = event => {
-  if (assertStopCallback(event.target)) return
+  // if (assertStopCallback(event.target)) return
   // event.preventDefault()
   let keys = eventModifiers(event)
   switch (event.key) {
@@ -67,11 +70,11 @@ const handleKeyDown = event => {
       keys.push((event.code.includes('Numpad') ? event.code.replace(/^Numpad(\w{1,3})\w*$/i, 'num$1') : event.key).toLowerCase())
       break
   }
-  handleEvent('down', event, keys)
+  handleEvent('down', event, keys, assertStopCallback(event.target))
 }
 
 const handleKeyUp = event => {
-  if (assertStopCallback(event.target)) return
+  // if (assertStopCallback(event.target)) return
   event.preventDefault()
   let keys = eventModifiers(event)
   switch (event.key) {
@@ -85,7 +88,7 @@ const handleKeyUp = event => {
       keys.push((event.code.includes('Numpad') ? event.code.replace(/^Numpad(\w{1,3})\w*$/i, 'num$1') : event.key).toLowerCase())
       break
   }
-  handleEvent('up', event, keys)
+  handleEvent('up', event, keys, assertStopCallback(event.target))
 }
 
 let handleSendEvent
@@ -104,7 +107,7 @@ const unbindKey = () => {
 const clearDownKeys = () => {
   let keys = Array.from(downKeys)
   for (let i = keys.length - 1; i > -1; i--) {
-    handleSendEvent(keys[i], 'up')
+    handleSendEvent(keys[i], keys[i], 'up', null, [keys[i]])
   }
   downKeys.clear()
 }

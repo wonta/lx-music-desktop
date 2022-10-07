@@ -33,7 +33,13 @@ div(:class="$style.container")
                       //- img(:src="item.img")
                     div(:class="$style.right" :src="item.img")
                       h4 {{item.name}}
-                      p(:class="$style.play_count") {{item.play_count}}
+                      div(:class="$style.songlist_info")
+                        span(v-if="item.total != null")
+                          svg-icon(name="music")
+                          | {{item.total}}
+                        span
+                          svg-icon(name="headphones")
+                          | {{item.play_count}}
                       p(:class="$style.author") {{item.author}}
                   li(:class="$style.item" style="cursor: default;" v-for="i in spaceNum")
                 div(:class="$style.pagination")
@@ -56,7 +62,6 @@ div(:class="$style.container")
 
 <script>
 import { mapGetters, mapMutations, mapActions } from 'vuex'
-import { scrollTo } from '@renderer/utils'
 import TagList from './components/TagList'
 import { tempList } from '@renderer/core/share/list'
 export default {
@@ -97,7 +102,7 @@ export default {
         case 'tx':
         case 'mg':
         case 'kg':
-        case 'xm':
+        // case 'xm':
           list.push({
             name: this.$t('songlist__open_list', { name: this.sourceInfo.sources.find(s => s.id == this.source).name }),
             id: 'importSongList',
@@ -122,7 +127,7 @@ export default {
       this.$nextTick(() => {
         this.getList(1).then(() => {
           this.$nextTick(() => {
-            scrollTo(this.$refs.dom_scrollContent, 0)
+            this.$refs.dom_scrollContent.scrollTo(0, 0)
           })
         })
       })
@@ -139,7 +144,7 @@ export default {
       this.$nextTick(() => {
         this.getList(1).then(() => {
           this.$nextTick(() => {
-            scrollTo(this.$refs.dom_scrollContent, 0)
+            this.$refs.dom_scrollContent.scrollTo(0, 0)
           })
         })
       })
@@ -164,6 +169,7 @@ export default {
   },
   mounted() {
     this.source = this.setting.songList.source
+    if (!this.sourceInfo.sourceIds.includes(this.source)) this.source = this.sourceInfo.sourceIds[0]
     this.isToggleSource = true
     this.tagInfo = this.setting.songList.tagInfo
     this.sortId = this.setting.songList.sortId
@@ -230,7 +236,7 @@ export default {
     handleToggleListPage(page) {
       this.getList(page).then(() => {
         this.$nextTick(() => {
-          scrollTo(this.$refs.dom_scrollContent, 0)
+          this.$refs.dom_scrollContent.scrollTo(0, 0)
         })
       })
     },
@@ -402,7 +408,9 @@ export default {
   align-items: center;
   padding-top: 20%;
 }
-
+.songList {
+  scroll-behavior: smooth;
+}
 .song-list-header {
   display: flex;
   flex-flow: row nowrap;
@@ -527,7 +535,10 @@ export default {
     .mixin-ellipsis-2;
   }
 }
-.play_count {
+.songlist_info {
+  display: flex;
+  flex-flow: row nowrap;
+  gap: 15px;
   margin-top: 12px;
   font-size: 12px;
   .mixin-ellipsis-1;
@@ -535,6 +546,9 @@ export default {
   line-height: 1.2;
   // text-indent: 24px;
   color: @color-theme_2-font-label;
+  svg {
+    margin-right: 2px;
+  }
 }
 .author {
   margin-top: 6px;

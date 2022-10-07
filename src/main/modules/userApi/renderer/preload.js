@@ -3,6 +3,10 @@ const needle = require('needle')
 const { createCipheriv, publicEncrypt, constants, randomBytes, createHash } = require('crypto')
 const USER_API_RENDERER_EVENT_NAME = require('../rendererEvent/name')
 
+for (const key of Object.keys(process.env)) {
+  if (/^(?:http_proxy|https_proxy|NO_PROXY)$/i.test(key)) delete process.env[key]
+}
+
 const sendMessage = (action, data, status, message) => {
   ipcRenderer.send(action, { data, status, message })
 }
@@ -165,7 +169,7 @@ contextBridge.exposeInMainWorld('lx', {
         headers: resp.headers,
         bytes: resp.bytes,
         raw: resp.raw,
-        body: body,
+        body,
       }, body)
     }).request
 
@@ -212,7 +216,7 @@ contextBridge.exposeInMainWorld('lx', {
       },
       rsaEncrypt(buffer, key) {
         buffer = Buffer.concat([Buffer.alloc(128 - buffer.length), buffer])
-        return publicEncrypt({ key: key, padding: constants.RSA_NO_PADDING }, buffer)
+        return publicEncrypt({ key, padding: constants.RSA_NO_PADDING }, buffer)
       },
       randomBytes(size) {
         return randomBytes(size)

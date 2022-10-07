@@ -12,8 +12,6 @@ export default {
   _requestObj_tags: null,
   _requestObj_hotTags: null,
   _requestObj_list: null,
-  _requestObj_listDetail: null,
-  _requestObj_listDetailLink: null,
   limit_list: 30,
   limit_song: 100000,
   successCode: 200,
@@ -50,11 +48,10 @@ export default {
   },
 
   async handleParseId(link, retryNum = 0) {
-    if (this._requestObj_listDetailLink) this._requestObj_listDetailLink.cancelHttp()
     if (retryNum > 2) throw new Error('link try max num')
 
-    this._requestObj_listDetailLink = httpFetch(link)
-    const { headers: { location }, statusCode } = await this._requestObj_listDetailLink.promise
+    const requestObj_listDetailLink = httpFetch(link)
+    const { headers: { location }, statusCode } = await requestObj_listDetailLink.promise
     // console.log(headers)
     if (statusCode > 400) return this.handleParseId(link, ++retryNum)
     const url = location == null ? link : location
@@ -83,13 +80,12 @@ export default {
     return { id, cookie }
   },
   async getListDetail(rawId, page, tryNum = 0) { // 获取歌曲列表内的音乐
-    if (this._requestObj_listDetail) this._requestObj_listDetail.cancelHttp()
     if (tryNum > 2) return Promise.reject(new Error('try max num'))
 
     const { id, cookie } = await this.getListId(rawId)
     if (cookie) this.cookie = cookie
 
-    this._requestObj_listDetail = httpFetch('https://music.163.com/api/linux/forward', {
+    const requestObj_listDetail = httpFetch('https://music.163.com/api/linux/forward', {
       method: 'post',
       headers: {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
@@ -105,7 +101,7 @@ export default {
         },
       }),
     })
-    const { statusCode, body } = await this._requestObj_listDetail.promise
+    const { statusCode, body } = await requestObj_listDetail.promise
     if (statusCode !== 200 || body.code !== this.successCode) return this.getListDetail(id, page, ++tryNum)
     let limit = 1000
     let rangeStart = (page - 1) * limit
@@ -156,21 +152,17 @@ export default {
             size,
           }
         case 320000:
-          if (item.h) {
-            size = sizeFormate(item.h.size)
-            types.push({ type: '320k', size })
-            _types['320k'] = {
-              size,
-            }
+          size = item.h ? sizeFormate(item.h.size) : null
+          types.push({ type: '320k', size })
+          _types['320k'] = {
+            size,
           }
         case 192000:
         case 128000:
-          if (item.l) {
-            size = sizeFormate(item.l.size)
-            types.push({ type: '128k', size })
-            _types['128k'] = {
-              size,
-            }
+          size = item.l ? sizeFormate(item.l.size) : null
+          types.push({ type: '128k', size })
+          _types['128k'] = {
+            size,
           }
       }
 
@@ -222,6 +214,7 @@ export default {
     })
   },
   filterList(rawData) {
+    // console.log(rawData)
     return rawData.map(item => ({
       play_count: this.formatPlayCount(item.playCount),
       id: item.id,
@@ -230,6 +223,7 @@ export default {
       time: item.createTime,
       img: item.coverImgUrl,
       grade: item.grade,
+      total: item.trackCount,
       desc: item.description,
       source: 'wy',
     }))

@@ -7,7 +7,6 @@ export default {
   _requestObj_tags: null,
   _requestObj_hotTags: null,
   _requestObj_list: null,
-  _requestObj_listDetail: null,
   limit_list: 36,
   limit_song: 10000,
   successCode: 200,
@@ -22,7 +21,7 @@ export default {
     },
   ],
   regExps: {
-    mInfo: /bitrate:(\d+),format:(\w+),size:([\w.]+)/,
+    mInfo: /level:(\w+),bitrate:(\d+),format:(\w+),size:([\w.]+)/,
     // http://www.kuwo.cn/playlist_detail/2886046289
     // https://m.kuwo.cn/h5app/playlist/2736267853?t=qqfriend
     listDetailLink: /^.+\/playlist(?:_detail)?\/(\d+)(?:\?.*|&.*$|#.*$|$)/,
@@ -138,6 +137,7 @@ export default {
       author: item.uname,
       name: item.name,
       // time: item.publish_time,
+      total: item.total,
       img: item.img,
       grade: item.favorcnt / 10,
       desc: item.desc,
@@ -154,6 +154,7 @@ export default {
         id: `digest-${item.digest}__${item.id}`,
         author: item.uname,
         name: item.name,
+        total: item.total,
         // time: item.publish_time,
         img: item.img,
         grade: item.favorcnt && item.favorcnt / 10,
@@ -165,13 +166,10 @@ export default {
   },
 
   getListDetailDigest8(id, page, tryNum = 0) {
-    if (this._requestObj_listDetail) {
-      this._requestObj_listDetail.cancelHttp()
-    }
     if (tryNum > 2) return Promise.reject(new Error('try max num'))
 
-    this._requestObj_listDetail = httpFetch(this.getListDetailUrl(id, page))
-    return this._requestObj_listDetail.promise.then(({ body }) => {
+    const requestObj = httpFetch(this.getListDetailUrl(id, page))
+    return requestObj.promise.then(({ body }) => {
       if (body.result !== 'ok') return this.getListDetail(id, page, ++tryNum)
       return {
         list: this.filterListDetail(body.musiclist),
@@ -190,24 +188,18 @@ export default {
     })
   },
   getListDetailDigest5Info(id, tryNum = 0) {
-    if (this._requestObj_listDetail) {
-      this._requestObj_listDetail.cancelHttp()
-    }
     if (tryNum > 2) return Promise.reject(new Error('try max num'))
-    this._requestObj_listDetail = httpFetch(`http://qukudata.kuwo.cn/q.k?op=query&cont=ninfo&node=${id}&pn=0&rn=1&fmt=json&src=mbox&level=2`)
-    return this._requestObj_listDetail.promise.then(({ statusCode, body }) => {
+    const requestObj = httpFetch(`http://qukudata.kuwo.cn/q.k?op=query&cont=ninfo&node=${id}&pn=0&rn=1&fmt=json&src=mbox&level=2`)
+    return requestObj.promise.then(({ statusCode, body }) => {
       if (statusCode != 200 || !body.child) return this.getListDetail(id, ++tryNum)
       // console.log(body)
       return body.child.length ? body.child[0].sourceid : null
     })
   },
   getListDetailDigest5Music(id, page, tryNum = 0) {
-    if (this._requestObj_listDetail) {
-      this._requestObj_listDetail.cancelHttp()
-    }
     if (tryNum > 2) return Promise.reject(new Error('try max num'))
-    this._requestObj_listDetail = httpFetch(`http://nplserver.kuwo.cn/pl.svc?op=getlistinfo&pid=${id}&pn=${page - 1}}&rn=${this.limit_song}&encode=utf-8&keyset=pl2012&identity=kuwo&pcmp4=1`)
-    return this._requestObj_listDetail.promise.then(({ body }) => {
+    const requestObj = httpFetch(`http://nplserver.kuwo.cn/pl.svc?op=getlistinfo&pid=${id}&pn=${page - 1}}&rn=${this.limit_song}&encode=utf-8&keyset=pl2012&identity=kuwo&pcmp4=1`)
+    return requestObj.promise.then(({ body }) => {
       // console.log(body)
       if (body.result !== 'ok') return this.getListDetail(id, page, ++tryNum)
       return {
@@ -252,34 +244,36 @@ export default {
   filterListDetail(rawData) {
     // console.log(rawData)
     return rawData.map(item => {
-      let infoArr = item.MINFO.split(';')
+      let infoArr = item.N_MINFO.split(';')
       let types = []
       let _types = {}
       for (let info of infoArr) {
         info = info.match(this.regExps.mInfo)
         if (info) {
           switch (info[2]) {
-            case 'flac':
-              types.push({ type: 'flac', size: info[3] })
-              _types.flac = {
-                size: info[3].toLocaleUpperCase(),
+            case '4000':
+              types.push({ type: 'flac32bit', size: info[4] })
+              _types.flac32bit = {
+                size: info[4].toLocaleUpperCase(),
               }
               break
-            case 'mp3':
-              switch (info[1]) {
-                case '320':
-                  types.push({ type: '320k', size: info[3] })
-                  _types['320k'] = {
-                    size: info[3].toLocaleUpperCase(),
-                  }
-                  break
-                case '192':
-                case '128':
-                  types.push({ type: '128k', size: info[3] })
-                  _types['128k'] = {
-                    size: info[3].toLocaleUpperCase(),
-                  }
-                  break
+            case '2000':
+              types.push({ type: 'flac', size: info[4] })
+              _types.flac = {
+                size: info[4].toLocaleUpperCase(),
+              }
+              break
+            case '320':
+              types.push({ type: '320k', size: info[4] })
+              _types['320k'] = {
+                size: info[4].toLocaleUpperCase(),
+              }
+              break
+            case '192':
+            case '128':
+              types.push({ type: '128k', size: info[4] })
+              _types['128k'] = {
+                size: info[4].toLocaleUpperCase(),
               }
               break
           }

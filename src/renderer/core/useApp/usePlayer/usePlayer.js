@@ -87,12 +87,14 @@ export default ({ setting }) => {
   const { addDelayNextTimeout, clearDelayNextTimeout } = useDelayNextTimeout({ playNext, timeout: 5000 })
   const { addDelayNextTimeout: addLoadTimeout, clearDelayNextTimeout: clearLoadTimeout } = useDelayNextTimeout({ playNext, timeout: 123000 })
 
+  let isGettingUrl = false
   const setUrl = (targetSong, isRefresh, isRetryed = false) => {
     let type = getPlayType(setting.value.player.highQuality, targetSong)
     // this.musicInfo.url = await getMusicUrl(targetSong, type)
     setAllStatus(t('player__geting_url'))
-    addLoadTimeout()
+    if (setting.value.player.autoSkipOnError) addLoadTimeout()
 
+    isGettingUrl = true
     return getUrl({
       musicInfo: targetSong,
       type,
@@ -113,10 +115,11 @@ export default ({ setting }) => {
       if (err.message == requestMsg.cancelRequest) return
       if (!isRetryed) return setUrl(targetSong, isRefresh, true)
       setAllStatus(err.message)
-      addDelayNextTimeout()
+      if (setting.value.player.autoSkipOnError) addDelayNextTimeout()
       return Promise.reject(err)
     }).finally(() => {
       clearLoadTimeout()
+      if (targetSong === musicInfoItem.value) isGettingUrl = false
     })
   }
   const setImg = ({ listId, musicInfo: targetSong }) => {
@@ -132,21 +135,24 @@ export default ({ setting }) => {
     }
   }
   const setLrc = (targetSong) => {
-    getLrc(targetSong).then(({ lyric, tlyric, lxlyric }) => {
+    getLrc(targetSong).then(({ lyric, tlyric, rlyric, lxlyric, rawInfo }) => {
       if (targetSong.songmid !== musicInfo.songmid) return
       return (
         setting.value.player.isS2t
           ? Promise.all([
             lyric ? langS2T(lyric) : Promise.resolve(''),
             tlyric ? langS2T(tlyric) : Promise.resolve(''),
+            rlyric ? langS2T(rlyric) : Promise.resolve(''),
             lxlyric ? langS2T(lxlyric) : Promise.resolve(''),
           ])
-          : Promise.resolve([lyric, tlyric, lxlyric])
-      ).then(([lyric, tlyric, lxlyric]) => {
+          : Promise.resolve([lyric, tlyric, rlyric, lxlyric])
+      ).then(([lyric, tlyric, rlyric, lxlyric]) => {
         setMusicInfo({
           lrc: lyric,
           tlrc: tlyric,
+          rlrc: rlyric,
           lxlrc: lxlyric,
+          rawlrc: rawInfo.lyric,
         })
       })
     }).catch((err) => {
@@ -162,6 +168,7 @@ export default ({ setting }) => {
   usePlayProgress({ setting, playNext })
   useMediaSessionInfo({ playPrev, playNext })
   usePlayEvent({
+    setting,
     playNext,
     setAllStatus,
     setUrl,
@@ -208,7 +215,9 @@ export default ({ setting }) => {
       img: null,
       lrc: null,
       tlrc: null,
+      rlrc: null,
       lxlrc: null,
+      rawlrc: null,
       url: null,
       name: '',
       singer: '',
@@ -219,6 +228,7 @@ export default ({ setting }) => {
   // 播放音乐
   const playMusic = async() => {
     // console.log('playMusic')
+    isGettingUrl = false
     setStopStatus()
     if (window.restorePlayInfo) {
       handleRestorePlay(window.restorePlayInfo)
@@ -313,10 +323,10 @@ export default ({ setting }) => {
           }
           return
         }
-        setResource(filePath)
+        if (!isGettingUrl) setResource(filePath)
       } else {
         // if (!this.assertApiSupport(this.targetSong.source)) return this.playNext()
-        setUrl(musicInfoItem.value)
+        if (!isGettingUrl) setUrl(musicInfoItem.value)
       }
       return
     }
