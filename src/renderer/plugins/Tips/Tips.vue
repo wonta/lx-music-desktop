@@ -1,6 +1,11 @@
 <template>
   <transition name="tips-fade" @after-leave="afterLeave">
-    <div v-show="visible" :style="{ left: position.left + 'px' , top: position.top + 'px', transform: transform }" ref="dom_tips" :class="$style.tips" role="presentation">{{message}}</div>
+    <div
+      v-show="visible" ref="dom_tips" :style="{ left: position.left + 'px' , top: position.top + 'px', transform, maxWidth, }"
+      :class="$style.tips" role="presentation"
+    >
+      {{ message }}
+    </div>
   </transition>
 </template>
 
@@ -21,6 +26,7 @@ export default {
         left: 0,
       },
       transform: 'translate(0, 0)',
+      maxWidth: '80%',
       cancel: null,
       setTips: null,
       aotoCloseTimer: null,
@@ -29,7 +35,10 @@ export default {
   watch: {
     message() {
       this.$nextTick(() => {
-        this.transform = `translate(${this.handleGetOffsetXY(this.position.left, this.position.top)})`
+        this.maxWidth = this.handleGetMaxWidth(this.position.left) + 'px'
+        this.$nextTick(() => {
+          this.transform = `translate(${this.handleGetOffsetXY(this.position.left, this.position.top)})`
+        })
       })
     },
   },
@@ -38,10 +47,15 @@ export default {
     el.parentNode.removeChild(el)
   },
   methods: {
+    handleGetMaxWidth(left) {
+      const containerWidth = document.documentElement.clientWidth
+      let maxWidth = containerWidth - left
+      return (maxWidth > left ? maxWidth : left - 12) - 30
+    },
     handleGetOffsetXY(left, top) {
       const tipsWidth = this.$refs.dom_tips.clientWidth
       const tipsHeight = this.$refs.dom_tips.clientHeight
-      const dom_container = document.body
+      const dom_container = document.documentElement
       const containerWidth = dom_container.clientWidth
       const containerHeight = dom_container.clientHeight
       const offsetWidth = containerWidth - left - tipsWidth
@@ -69,16 +83,18 @@ export default {
   line-height: 1.2;
   word-wrap: break-word;
   padding: 4px 5px;
-  z-index: 999;
+  z-index: 10001;
   font-size: 12px;
-  max-width: 80%;
-  color: @color-theme_2-font;
+  // max-width: 80%;
+  color: var(--color-font);
   border-radius: 3px;
-  background: @color-green-theme_2-background_1;
+  background: var(--color-content-background);
   overflow: hidden;
   pointer-events: none;
   // text-align: justify;
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
+  white-space: pre-wrap;
+  box-sizing: border-box;
 }
 
 :global(.tips-fade-enter-active), :global(.tips-fade-leave-active) {
@@ -87,15 +103,6 @@ export default {
 :global(.tips-fade-enter), :global(.tips-fade-leave-to) {
   opacity: 0;
 }
-
-each(@themes, {
-  :global(#root.@{value}) {
-    ~.tips {
-      color: ~'@{color-@{value}-theme_2-font}';
-      background: ~'@{color-@{value}-theme_2-background_1}';
-    }
-  }
-})
 
 
 </style>

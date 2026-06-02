@@ -16,7 +16,8 @@ module.exports = merge(baseConfig, {
       },
       __VUE_OPTIONS_API__: 'true',
       __VUE_PROD_DEVTOOLS__: 'false',
-      __static: `"${path.join(__dirname, '../../src/static').replace(/\\/g, '\\\\')}"`,
+      __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: 'false',
+      staticPath: `"${path.join(__dirname, '../../src/static').replace(/\\/g, '\\\\')}"`,
     }),
   ],
   performance: {

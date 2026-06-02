@@ -1,26 +1,28 @@
 <template>
-<material-modal :show="show" :bg-close="bgClose" @close="handleClose" max-width="70%">
-  <main :class="$style.main">
-    <h2>{{$t('list_add__multiple_' + (isMove ? 'title_move' : 'title_add'), { num: musicList.length })}}</h2>
-    <div class="scroll" :class="$style.btnContent">
-      <base-btn :class="$style.btn" :aria-label="$t('list_add__multiple_btn_title', { name: item.name })" :key="item.id" @click="handleClick(index)" v-for="(item, index) in lists">{{item.name}}</base-btn>
-      <base-btn :class="[$style.btn, $style.newList, isEditing ? $style.editing : null]" @click="handleEditing($event)" :aria-label="$t('lists__new_list_btn')">
-        <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" viewBox="0 0 42 42" space="preserve">
-          <use xlink:href="#icon-addTo"></use>
-        </svg>
-        <input :class="$style.newListInput" :value="newListName" type="text" :placeholder="$t('lists__new_list_input')" @keyup.enter="handleSaveList($event)" @blur="handleSaveList($event)"/>
-      </base-btn>
-      <span :class="$style.btn" :key="i" v-for="i in spaceNum"></span>
-    </div>
-  </main>
-</material-modal>
+  <material-modal :show="show" :bg-close="bgClose" max-width="70%" :teleport="teleport" @close="handleClose">
+    <main :class="$style.main">
+      <h2>{{ $t('list_add__multiple_' + (isMove ? 'title_move' : 'title_add'), { num: musicList.length }) }}</h2>
+      <div class="scroll" :class="$style.btnContent">
+        <base-btn v-for="(item, index) in lists" :key="item.id" :class="$style.btn" :aria-label="$t('list_add__multiple_btn_title', { name: item.name })" @click="handleClick(index)">{{ item.name }}</base-btn>
+        <base-btn :class="[$style.btn, $style.newList, isEditing ? $style.editing : null]" :aria-label="$t('lists__new_list_btn')" @click="handleEditing($event)">
+          <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" viewBox="0 0 42 42" space="preserve">
+            <use xlink:href="#icon-addTo" />
+          </svg>
+          <base-input :class="$style.newListInput" :value="newListName" :placeholder="$t('lists__new_list_input')" @keyup.enter="handleSaveList($event)" @blur="handleSaveList($event)" />
+        </base-btn>
+        <span v-for="i in spaceNum" :key="i" :class="$style.btn" />
+      </div>
+    </main>
+  </material-modal>
 </template>
 
 <script>
-import { mapMutations } from 'vuex'
-import { computed } from '@renderer/utils/vueTools'
-import { defaultList, loveList, userLists } from '@renderer/core/share/list'
+import { computed } from '@common/utils/vueTools'
+import { defaultList, loveList, userLists } from '@renderer/store/list/state'
+import { addListMusics, moveListMusics, createUserList } from '@renderer/store/list/action'
 import useKeyDown from '@renderer/utils/compositions/useKeyDown'
+import { useI18n } from '@root/lang'
+import { dialog } from '@renderer/plugins/Dialog'
 
 export default {
   props: {
@@ -56,16 +58,20 @@ export default {
       type: Boolean,
       default: false,
     },
-    teleport: String,
+    teleport: {
+      type: String,
+      default: '#root',
+    },
   },
   emits: ['update:show', 'confirm'],
   setup(props) {
     const keyModDown = useKeyDown('mod')
+    const t = useI18n()
 
     const lists = computed(() => {
       return [
-        defaultList,
-        loveList,
+        { ...defaultList, name: t(defaultList.name) },
+        { ...loveList, name: t(loveList.name) },
         ...userLists,
       ].filter(l => !props.excludeListId.includes(l.id))
     })
@@ -95,7 +101,6 @@ export default {
     window.removeEventListener('resize', this.handleResize)
   },
   methods: {
-    ...mapMutations('list', ['listAddMultiple', 'listMoveMultiple', 'createUserList']),
     handleResize() {
       const width = window.innerWidth
       this.rowNum = width < 1920
@@ -105,9 +110,10 @@ export default {
           : width < 3840 ? 5 : 6
     },
     handleClick(index) {
-      this.isMove
-        ? this.listMoveMultiple({ fromId: this.fromListId, toId: this.lists[index].id, list: this.musicList })
-        : this.listAddMultiple({ id: this.lists[index].id, list: this.musicList })
+      const list = 'progress' in this.musicList[0] ? this.musicList.map(t => t.metadata.musicInfo) : this.musicList
+
+      if (this.isMove) void moveListMusics(this.fromListId, this.lists[index].id, list)
+      else void addListMusics(this.lists[index].id, list)
 
       if (this.keyModDown && !this.isMove) return
       this.$nextTick(() => {
@@ -124,12 +130,14 @@ export default {
       this.isEditing = true
       this.$nextTick(() => event.currentTarget.querySelector('.' + this.$style.newListInput).focus())
     },
-    handleSaveList(event) {
+    async handleSaveList(event) {
       let name = event.target.value
       this.newListName = event.target.value = ''
       this.isEditing = false
-      if (!name) return
-      this.createUserList({ name })
+      if (!name || (
+        userLists.some(l => l.name == name) && !(await dialog.confirm(window.i18n.t('list_duplicate_tip'))))
+      ) return
+      void createUserList({ name })
     },
   },
 }
@@ -151,14 +159,14 @@ export default {
   // overflow: hidden;
   h2 {
     font-size: 13px;
-    color: @color-theme_2-font;
+    color: var(--color-font);
     line-height: 1.3;
     text-align: center;
     padding: 15px;
   }
 }
 
-.btn-content {
+.btnContent {
   flex: auto;
   max-height: 100%;
   padding-right: 15px;
@@ -178,13 +186,13 @@ export default {
   padding: 0 10px !important;
   width: calc(@item-width - 15px);
   min-width: 160px;
-  .mixin-ellipsis-1;
+  .mixin-ellipsis-1();
 }
 
 .newList {
-  border: 1px dashed @color-theme-hover;
-  background-color: @color-theme_2-background_2;
-  color: @color-theme-hover;
+  border: 1px dashed var(--color-primary-font-hover);
+  // background-color: var(--color-main-background);
+  color: var(--color-primary-font-hover);
   opacity: .7;
 
   svg {
@@ -209,16 +217,13 @@ export default {
   top: 0;
   width: 100%;
   height: 34px;
-  border: none;
-  padding: 0;
   line-height: 34px;
-  background: none;
-  outline: none;
+  background: none !important;
   font-size: 14px;
   text-align: center;
-  font-family: inherit;
   box-sizing: border-box;
   padding: 0 10px;
+  border-radius: 0;
   display: none;
 }
 
@@ -240,21 +245,5 @@ export default {
     width: calc(@item-width4 - 15px);
   }
 }
-
-
-each(@themes, {
-  :global(#root.@{value}) {
-    .main {
-      h2 {
-        color: ~'@{color-@{value}-theme_2-font}';
-      }
-    }
-    .newList {
-      border-color: ~'@{color-@{value}-theme-hover}';
-      color: ~'@{color-@{value}-theme-hover}';
-      background-color: ~'@{color-@{value}-theme_2-background_2}';
-    }
-  }
-})
 
 </style>

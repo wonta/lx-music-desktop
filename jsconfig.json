@@ -1,17 +1,18 @@
 {
   "compilerOptions": {
-    "baseUrl": "./",
+    "rootDir": "./",
     "paths": {
-      "@/*": ["src/*"],
-      "@main/*": ["src/main/*"],
-      "@renderer/*": ["src/renderer/*"],
-      "@lyric/*": ["src/renderer-lyric/*"],
-      "@static/*": ["src/static/*"],
-      "@common/*": ["src/common/*"],
-    },
+      "@main/*": ["./src/main/*"],
+      "@renderer/*": ["./src/renderer/*"],
+      "@lyric/*": ["./src/renderer-lyric/*"],
+      "@static/*": ["./src/static/*"],
+      "@common/*": ["./src/common/*"],
+    }
   },
   "vueCompilerOptions": {
-    "experimentalDisableTemplateSupport": true
+    "plugins": [
+      "@vue/language-plugin-pug"
+    ]
   },
   "exclude": ["node_modules", "build", "dist"]
 }
